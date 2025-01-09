@@ -30,14 +30,6 @@ export type AnalysisResult = {
   errors?: ValidationError[];
 };
 
-// TODO: invalid decimal numbers like 0.1.2 ++
-// TODO: invalid identifiers like 1a < error 1 is correct a is not
-// TODO: invalid operators like ++ (without parantheses) < error second plus is incorrect
-// TODO: invalid parantheses like (a + b => should specify concrete position < check
-// TODO: invalid parantheses like a + b) => should specify concrete position < check
-
-// TODO: чи може вираз мати лише 1 токен? < a, -3
-
 export const tokenPatterns: {
   type: TokenType;
   regex: RegExp;
@@ -136,7 +128,7 @@ export class ExpressionAnalyzer {
           message: `Неочікуваний токен '${remaining[0]}' на позиції ${position}`,
           position,
         });
-        position++; // @TODO: test
+        position++;
       }
     }
 
