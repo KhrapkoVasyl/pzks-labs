@@ -146,23 +146,25 @@ export class ExpressionAnalyzer {
       return errors;
     }
 
-    let prevToken = tokens[0];
-    this.validateStartToken(prevToken, errors);
+    let prevToken: Token | undefined = undefined;
+    this.validateStartToken(tokens[0], errors);
 
-    for (const token of tokens.slice(1)) {
-      const expectedNextStates: TokenType[] =
-        transitionGraph[prevToken.type] || ([] as TokenType[]);
+    for (const token of tokens) {
+      if (prevToken) {
+        const expectedNextStates: TokenType[] =
+          transitionGraph[prevToken.type] || ([] as TokenType[]);
 
-      if (!expectedNextStates.includes(token.type)) {
-        const expectedStr = transitionGraph[prevToken.type]
-          ?.join(', ')
-          .toString();
-        errors.push({
-          message:
-            `Неочікуваний токен '${token.value}' після токену '${prevToken.value}' на позиції ${token.position}. ` +
-            `Очікувані типи токенів: ${expectedStr}`,
-          position: token.position,
-        });
+        if (!expectedNextStates.includes(token.type)) {
+          const expectedStr = transitionGraph[prevToken.type]
+            ?.join(', ')
+            .toString();
+          errors.push({
+            message:
+              `Неочікуваний токен '${token.value}' після токену '${prevToken.value}' на позиції ${token.position}. ` +
+              `Очікувані типи токенів: ${expectedStr}`,
+            position: token.position,
+          });
+        }
       }
 
       if (token.type === TokenType.PAREN_OPEN) {
@@ -190,7 +192,7 @@ export class ExpressionAnalyzer {
       }
     }
 
-    this.validateEndToken(prevToken, errors);
+    this.validateEndToken(prevToken!, errors);
 
     return errors;
   }
