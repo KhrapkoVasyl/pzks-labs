@@ -141,22 +141,17 @@ export class ExpressionAnalyzer {
   ): ValidationError[] {
     const parenStack: Array<{ position: number; value: '(' | ')' }> = [];
 
-    console.log('\n\n Tokens:', tokens, '\n\n');
-
     if (!tokens.length) {
       errors.push({ message: 'Заданий вираз не містить валідних токенів' });
       return errors;
     }
 
-    this.validateStartToken(tokens[0], errors);
+    let prevToken = tokens[0];
+    this.validateStartToken(prevToken, errors);
 
-    let prevToken: Token = tokens.shift() as Token;
-
-    for (const token of tokens) {
+    for (const token of tokens.slice(1)) {
       const expectedNextStates: TokenType[] =
         transitionGraph[prevToken.type] || ([] as TokenType[]);
-
-      console.log('\n\n Valid next states:', expectedNextStates, '\n\n');
 
       if (!expectedNextStates.includes(token.type)) {
         const expectedStr = transitionGraph[prevToken.type]
@@ -234,9 +229,6 @@ export class ExpressionAnalyzer {
       (a, b) => (a?.position ?? -1) - (b?.position ?? -1)
     );
 
-    console.log('\n\n Tokens:', tokens, '\n\n');
-    console.log('\n\n Errors:', errors, '\n\n');
-
     return errors.length > 0
       ? { valid: false, errors }
       : { valid: true, tokens };
@@ -249,10 +241,40 @@ export class ExpressionAnalyzer {
   }
 
   logValidResult(expression: string, result: AnalysisResult): void {
-    // TODO
+    const green = '\x1b[32m';
+    const reset = '\x1b[0m';
+
+    console.log(`Заданий вираз '${expression}' — ${green}валідний${reset}`);
+    const tokens = result
+      .tokens!.map((token) => `${token.type}('${token.value}')`)
+      .join(' ');
+    console.log(`Токени: ${tokens}`);
   }
 
   logInvalidResult(expression: string, result: AnalysisResult): void {
-    // TODO
+    const red = '\x1b[31m';
+    const reset = '\x1b[0m';
+
+    console.log(`Задано ${red}невалідний${reset} вираз:`);
+
+    const coloredExpression = expression.split('');
+    const errorMarkers = Array(expression.length).fill(' ');
+    const errorMessages: string[] = [];
+
+    for (const error of result.errors!) {
+      if (error.position) {
+        coloredExpression[error.position] = `${red}${
+          coloredExpression[error.position]
+        }${reset}`;
+        errorMarkers[error.position] = '^';
+      }
+      errorMessages.push(`${red}- ${error.message}${reset}`);
+    }
+
+    const expressionStr = coloredExpression.join('');
+
+    console.log(`${expressionStr}`);
+    console.log(`${red}${errorMarkers.join('')}${reset}`);
+    console.log(errorMessages.join('\n'));
   }
 }
