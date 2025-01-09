@@ -24,13 +24,19 @@ export type ValidationError = {
   position?: number;
 };
 
+export type AnalysisResult = {
+  valid: boolean;
+  tokens?: Token[];
+  errors?: ValidationError[];
+};
+
 // TODO: invalid decimal numbers like 0.1.2 ++
 // TODO: invalid identifiers like 1a < error 1 is correct a is not
 // TODO: invalid operators like ++ (without parantheses) < error second plus is incorrect
 // TODO: invalid parantheses like (a + b => should specify concrete position < check
 // TODO: invalid parantheses like a + b) => should specify concrete position < check
 
-// TODO: should work with -3, +3, but not with + +3, - -3
+// TODO: чи може вираз мати лише 1 токен? < a, -3
 
 export const tokenPatterns: {
   type: TokenType;
@@ -64,7 +70,6 @@ export const transitionGraph: Partial<Record<TokenType, TokenType[]>> = {
   IDENTIFIER: [
     TokenType.ADDITION_OPERATOR,
     TokenType.MULTIPLICATION_OPERATOR,
-    TokenType.PAREN_OPEN,
     TokenType.PAREN_CLOSE,
     TokenType.END_EXPR,
   ],
@@ -110,7 +115,7 @@ export class ExpressionAnalyzer {
 
           if (pattern.type === TokenType.INVALID_FRACTIONAL) {
             errors.push({
-              message: 'Invalid fractional part at position ' + position,
+              message: `Невалідна десяткова частина '${tokenValue}' на позиції ${position}`,
               position,
             });
 
@@ -128,7 +133,7 @@ export class ExpressionAnalyzer {
 
       if (!match) {
         errors.push({
-          message: `Unexpected token ${remaining[0]} at position ${position}`,
+          message: `Неочікуваний токен '${remaining[0]}' на позиції ${position}`,
           position,
         });
         position++; // @TODO: test
@@ -142,27 +147,33 @@ export class ExpressionAnalyzer {
     tokens: Token[],
     errors: ValidationError[] = []
   ): ValidationError[] {
-    let state: TokenType = TokenType.START_EXPR;
     const parenStack: Array<{ position: number; value: '(' | ')' }> = [];
 
     console.log('\n\n Tokens:', tokens, '\n\n');
 
     if (!tokens.length) {
-      errors.push({ message: 'Empty expression' }); // @TODO: change with checking for START TOKEN and its transitions
+      errors.push({ message: 'Заданий вираз не містить валідних токенів' });
       return errors;
     }
 
     this.validateStartToken(tokens[0], errors);
 
+    let prevToken: Token = tokens.shift() as Token;
+
     for (const token of tokens) {
       const expectedNextStates: TokenType[] =
-        transitionGraph[state] || ([] as TokenType[]);
+        transitionGraph[prevToken.type] || ([] as TokenType[]);
 
       console.log('\n\n Valid next states:', expectedNextStates, '\n\n');
 
       if (!expectedNextStates.includes(token.type)) {
+        const expectedStr = transitionGraph[prevToken.type]
+          ?.join(', ')
+          .toString();
         errors.push({
-          message: `Unexpected token '${token.value}' at position ${token.position}`,
+          message:
+            `Неочікуваний токен '${token.value}' після токену '${prevToken.value}' на позиції ${token.position}. ` +
+            `Очікувані типи токенів: ${expectedStr}`,
           position: token.position,
         });
       }
@@ -174,33 +185,40 @@ export class ExpressionAnalyzer {
       if (token.type === TokenType.PAREN_CLOSE) {
         if (parenStack.length === 0 || parenStack.pop()?.value !== '(') {
           errors.push({
-            message: `Unmatched closing parenthesis at position ${token.position}`,
+            message: `Закриваюча дужка не має парної відкриваючої на позиції ${token.position}`,
             position: token.position,
           });
         }
       }
 
-      state = token.type;
+      prevToken = token;
     }
 
     if (parenStack.length > 0) {
       for (const paren of parenStack) {
         errors.push({
-          message: `Unmatched opening parenthesis at position ${paren.position}`,
+          message: `Відкриваюча дужка не має парної закриваючої на позиції ${paren.position}`,
           position: paren.position,
         });
       }
     }
 
-    this.validateEndToken(tokens[tokens.length - 1], errors);
+    this.validateEndToken(prevToken, errors);
 
     return errors;
   }
 
   validateStartToken(startToken: Token, errors: ValidationError[]): void {
     if (!transitionGraph[TokenType.START_EXPR]?.includes(startToken.type)) {
+      const expectedStartTokens = transitionGraph[TokenType.START_EXPR];
+      const expectedStartTokensString = expectedStartTokens
+        ?.join(', ')
+        .toString();
+
       errors.push({
-        message: `Unexpected start token '${startToken.type}' at position ${startToken.position}`,
+        message:
+          `Неочікуваний початковий токен '${startToken.value}' на позиції ${startToken.position}. ` +
+          `Очікувані типи токенів: ${expectedStartTokensString}.`,
         position: startToken.position,
       });
     }
@@ -211,30 +229,38 @@ export class ExpressionAnalyzer {
 
     if (!transitionsForLastToken?.includes(TokenType.END_EXPR)) {
       errors.push({
-        message: `Unexpected end token '${lastToken.type}' at position ${lastToken.position}`,
+        message: `Неочікуваний кінець виразу після оператора '${lastToken.value}' на позиції ${lastToken.position}`,
         position: lastToken.position,
       });
     }
   }
 
-  analyzeExpression(expression: string): {
-    valid: boolean;
-    tokens?: Token[];
-    errors?: ValidationError[];
-  } {
-    try {
-      const expressionErrors: ValidationError[] = [];
-      const tokens = this.tokenize(expression, expressionErrors);
-      const errors = this.validateTokens(tokens, expressionErrors);
+  analyzeExpression(expression: string): AnalysisResult {
+    const expressionErrors: ValidationError[] = [];
+    const tokens = this.tokenize(expression, expressionErrors);
+    const errors = this.validateTokens(tokens, expressionErrors).sort(
+      (a, b) => (a?.position ?? -1) - (b?.position ?? -1)
+    );
 
-      console.log('\n\n Errors:', errors, '\n\n');
+    console.log('\n\n Tokens:', tokens, '\n\n');
+    console.log('\n\n Errors:', errors, '\n\n');
 
-      return errors.length > 0
-        ? { valid: false, errors }
-        : { valid: true, tokens };
-    } catch (e) {
-      console.log('\n\n DEBUGERROR', e, '\n\n'); // TODO: remove try catch
-      throw e;
-    }
+    return errors.length > 0
+      ? { valid: false, errors }
+      : { valid: true, tokens };
+  }
+
+  logResult(expression: string, result: AnalysisResult): void {
+    return result.valid
+      ? this.logValidResult(expression, result)
+      : this.logInvalidResult(expression, result);
+  }
+
+  logValidResult(expression: string, result: AnalysisResult): void {
+    // TODO
+  }
+
+  logInvalidResult(expression: string, result: AnalysisResult): void {
+    // TODO
   }
 }
