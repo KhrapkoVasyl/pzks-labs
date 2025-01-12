@@ -34,7 +34,6 @@ const exampleExpressions: string[] = [
   '74 89.23',
   '12.32 + * 11',
   'var1 / - + var2',
-  'var23 + ( - (',
 ];
 
 for (const expression of exampleExpressions) {
