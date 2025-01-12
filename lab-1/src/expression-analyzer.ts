@@ -264,7 +264,7 @@ export class ExpressionAnalyzer {
     const errorMessages: string[] = [];
 
     for (const error of result.errors!) {
-      if (error.position) {
+      if (error.position !== undefined) {
         coloredExpression[error.position] = `${red}${
           coloredExpression[error.position]
         }${reset}`;
