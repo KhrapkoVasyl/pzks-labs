@@ -10,7 +10,7 @@ export enum TokenType {
   END_EXPR = 'END_EXPR', // Кінець виразу
 
   // INVALID tokens
-  INVALID_FRACTIONAL = 'INVALID_FRACTIONAL',
+  INVALID_FRACTIONAL = 'INVALID_FRACTIONAL', // '.123', '123.123.123'
 }
 
 export type Token = {
