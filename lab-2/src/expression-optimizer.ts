@@ -11,29 +11,24 @@ export class ExpressionOptimizer {
     let optimizedExpression: Token[] = expressionTokens;
     let optimized = true;
 
-    this.optimizeUnaryOperatorBeforeZero(optimizedExpression); // (-0)-32 = 0-32
+    this.optimizeUnaryOperatorBeforeZero(
+      optimizedExpression,
+      optomizationSteps
+    ); // (-0)-32 = 0-32
+
+    // zeros ()
+    // ones
+    // identifiers a-a, a/a
+    // calculations
+    // parantesis
+    // grouping with balancing
+    // tree
 
     while (optimized) {
       optimized = false;
-      // zeros ()
-      // ones
-      // identifiers a-a, a/a
-      // calculations
-      // parantesis
-      // grouping with balancing
-      // tree
-      // const { shouldStop, error } =
-      //   this.handleDivisionByZero(optimizedExpression);
-      // if (shouldStop) {
-      //   const success = false;
-      //   const errors = [error!];
-      //   return { success, optimizedExpression, optomizationSteps, errors };
-      // }
-      //
-      //
-      //
-      //
     }
+
+    console.log('Optimization steps:', optomizationSteps);
 
     // (-1+3)+12+(-0)-32
 
@@ -45,20 +40,18 @@ export class ExpressionOptimizer {
     };
   }
 
-  private optimizeUnaryOperatorBeforeZero(expressionTokens: Token[]): boolean {
+  private optimizeUnaryOperatorBeforeZero(
+    expressionTokens: Token[],
+    optomizationSteps: string[]
+  ): boolean {
     let isOptimized = false;
 
     let i = 0;
 
     while (expressionTokens[i]) {
-      console.log('\n\n');
       const token = expressionTokens[i];
       const prevToken = expressionTokens[i - 1];
       const tokenBeforeUnary = expressionTokens[i - 2];
-
-      console.log('Token:', token);
-      console.log('Prev token:', prevToken);
-      console.log('tokenBeforeUnary:', tokenBeforeUnary);
 
       const shouldSkip =
         token.type !== TokenType.NUMBER ||
@@ -66,22 +59,15 @@ export class ExpressionOptimizer {
         prevToken?.type !== TokenType.ADDITION_OPERATOR ||
         ![TokenType.PAREN_OPEN, undefined].includes(tokenBeforeUnary?.type);
 
-      console.log('Should skip:', shouldSkip);
-
       if (shouldSkip) {
         i++;
         continue;
       }
 
-      console.log('Expression before optimization:', expressionTokens);
-
       let deleteCount = 1;
       let deleteFrom = i - 1;
 
       const tokenAfterZero = expressionTokens[i + 1];
-
-      console.log('Token before unary:', tokenBeforeUnary);
-      console.log('Token after zero:', tokenAfterZero);
 
       const shouldOpenParen =
         tokenBeforeUnary?.type === TokenType.PAREN_OPEN &&
@@ -92,11 +78,13 @@ export class ExpressionOptimizer {
         deleteFrom = i - 2;
       }
 
-      console.log('Delete count:', deleteCount);
-
+      const expBefore = this.tokensToString(expressionTokens);
       expressionTokens.splice(deleteFrom, deleteCount + 1, token);
+      const expAfter = this.tokensToString(expressionTokens);
 
-      console.log('Optimized expression:', expressionTokens);
+      optomizationSteps.push(
+        `Оптимізація унарного оператора перед нулем: ${expBefore} = ${expAfter} `
+      );
 
       i -= deleteCount;
 
@@ -151,5 +139,9 @@ export class ExpressionOptimizer {
     return index >= 0
       ? { hasDivisionByZero: true, index: index }
       : { hasDivisionByZero: false };
+  }
+
+  public tokensToString(tokens: Token[]): string {
+    return tokens.map((token) => token.value).join('');
   }
 }
