@@ -9,12 +9,7 @@ export class ExpressionOptimizer {
   } {
     const optomizationSteps: string[] = [];
     let optimizedExpression: Token[] = expressionTokens;
-    let optimized = true;
-
-    this.optimizeUnaryOperatorBeforeZero(
-      optimizedExpression,
-      optomizationSteps
-    ); // (-0)-32 = 0-32
+    const errors: ValidationError[] = [];
 
     // zeros ()
     // ones
@@ -24,11 +19,40 @@ export class ExpressionOptimizer {
     // grouping with balancing
     // tree
 
-    while (optimized) {
+    let optimized = true;
+
+    while (optimized && errors.length === 0) {
+      console.log(
+        '\n\nOptimized expression:',
+        this.tokensToString(optimizedExpression),
+        '\n\n'
+      );
       optimized = false;
+
+      optimized = this.optimizeUnaryOperatorBeforeZero(
+        optimizedExpression,
+        optomizationSteps
+      ); // (-0)-32 = 0-32
+
+      const { shouldStop } = this.handleDivisionByZero(
+        optimizedExpression,
+        errors
+      );
+
+      if (shouldStop) {
+        break;
+      }
+
+      optimized =
+        optimized ||
+        this.optimizeZeros(optimizedExpression, optomizationSteps) ||
+        this.optimizeOnes(optimizedExpression, optomizationSteps) ||
+        this.optimizeCalculations(optimizedExpression, optomizationSteps) ||
+        this.openParenthesis(optimizedExpression, optomizationSteps);
     }
 
     console.log('Optimization steps:', optomizationSteps);
+    console.log('Optimization erros:', errors);
 
     // (-1+3)+12+(-0)-32
 
@@ -40,18 +64,262 @@ export class ExpressionOptimizer {
     };
   }
 
+  private optimizeZeros(tokens: Token[], steps: string[]): boolean {
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+
+      if (token.type !== TokenType.NUMBER || Number(token.value) !== 0) {
+        continue;
+      }
+
+      const prevToken = tokens[i - 1];
+      const nextToken = tokens[i + 1];
+
+      // a-0+b = a+b
+      const isSurroundedByAdditionOperators =
+        (!prevToken ||
+          prevToken.type === TokenType.ADDITION_OPERATOR ||
+          prevToken.type === TokenType.PAREN_OPEN) &&
+        (!nextToken ||
+          nextToken.type === TokenType.ADDITION_OPERATOR ||
+          nextToken.type === TokenType.PAREN_CLOSE);
+
+      if (isSurroundedByAdditionOperators) {
+        const expBefore = this.tokensToString(tokens);
+
+        let deleteCount = 1;
+        let deleteFrom = i;
+
+        // remove operation before 0
+        if (prevToken && prevToken.type === TokenType.ADDITION_OPERATOR) {
+          deleteCount++;
+          deleteFrom--;
+        }
+
+        // remove unary "+" after 0
+        if (
+          !prevToken ||
+          (prevToken.type === TokenType.PAREN_OPEN &&
+            nextToken?.type === TokenType.ADDITION_OPERATOR &&
+            nextToken.value === '+')
+        ) {
+          deleteCount++;
+        }
+
+        tokens.splice(deleteFrom, deleteCount);
+        const expAfter = this.tokensToString(tokens);
+
+        steps.push(
+          `Оптимізація додавання/віднімання з нулем: ${expBefore} = ${expAfter}`
+        );
+
+        return true;
+      }
+
+      // a + b*0 = a + 0
+      const isMultiplicationOnZero =
+        prevToken?.type === TokenType.MULTIPLICATION_OPERATOR &&
+        prevToken?.value === '*';
+
+      if (isMultiplicationOnZero) {
+        let deleteCount = 2;
+        const firstMultiplierIndex = i - 2;
+        let deleteFrom = firstMultiplierIndex;
+        const firstMultiplier = tokens[firstMultiplierIndex];
+
+        if (firstMultiplier?.type === TokenType.PAREN_CLOSE) {
+          const tokensInParenthesis = this.findTokensInParanthesisRight(
+            tokens,
+            firstMultiplierIndex
+          );
+          deleteCount = tokensInParenthesis.length + 1;
+          deleteFrom = i - deleteCount;
+        }
+
+        const expBefore = this.tokensToString(tokens);
+
+        const removed = tokens.splice(deleteFrom, deleteCount);
+
+        const expAfter = this.tokensToString(tokens);
+
+        const removedStr = this.tokensToString(removed.slice(0, -1));
+
+        steps.push(
+          `Оптимізація множення ${removedStr} на 0: ${expBefore} = ${expAfter}`
+        );
+
+        return true;
+      }
+
+      // b + 0*c = b + 0
+      const isZeroMultiplication =
+        nextToken?.type === TokenType.MULTIPLICATION_OPERATOR &&
+        nextToken?.value === '*';
+
+      if (isZeroMultiplication) {
+        let deleteCount = 2;
+        const secondMultiplierIndex = i + 2;
+        let deleteFrom = i + 1;
+
+        const secondMultiplier = tokens[secondMultiplierIndex];
+
+        if (secondMultiplier?.type === TokenType.PAREN_OPEN) {
+          const tokensInParenthesis = this.findTokensInParanthesisLeft(
+            tokens,
+            secondMultiplierIndex
+          );
+          deleteCount = tokensInParenthesis.length + 1;
+        }
+
+        const expBefore = this.tokensToString(tokens);
+
+        const removed = tokens.splice(deleteFrom, deleteCount);
+
+        const expAfter = this.tokensToString(tokens);
+
+        const removedStr = this.tokensToString(removed.slice(1));
+
+        steps.push(
+          `Оптимізація множення 0 на ${removedStr}: ${expBefore} = ${expAfter}`
+        );
+
+        return true;
+      }
+
+      //
+    }
+
+    return false;
+  }
+
+  private findTokensInParanthesisRight(
+    tokens: Token[],
+    closingParenthesisIndex: number
+  ): Token[] {
+    const result: Token[] = [];
+    let openParensCount = 0;
+
+    for (let i = closingParenthesisIndex; i >= 0; i--) {
+      const token = tokens[i];
+      result.unshift(token);
+
+      if (token.type === TokenType.PAREN_CLOSE) {
+        openParensCount++;
+      } else if (token.type === TokenType.PAREN_OPEN) {
+        openParensCount--;
+
+        if (openParensCount === 0) {
+          return result;
+        }
+      }
+    }
+
+    throw new Error(
+      `Відповідна відкриваюча дужка не знайдена для закриваючої на індексі ${closingParenthesisIndex}. Вираз ${this.tokensToString(
+        tokens
+      )}`
+    );
+  }
+
+  private findTokensInParanthesisLeft(
+    tokens: Token[],
+    openingParenthesisIndex: number
+  ): Token[] {
+    const result: Token[] = [];
+    let openParensCount = 0;
+
+    for (let i = openingParenthesisIndex; i < tokens.length; i++) {
+      const token = tokens[i];
+      result.push(token);
+
+      if (token.type === TokenType.PAREN_OPEN) {
+        openParensCount++;
+      } else if (token.type === TokenType.PAREN_CLOSE) {
+        openParensCount--;
+
+        if (openParensCount === 0) {
+          return result;
+        }
+      }
+    }
+
+    throw new Error(
+      `Відповідна закриваюча дужка не знайдена для відкриваючої на індексі ${openingParenthesisIndex}. Вираз ${this.tokensToString(
+        tokens
+      )}`
+    );
+  }
+
+  private optimizeOnes(tokens: Token[], steps: string[]): boolean {
+    let isOptimized = false;
+
+    return isOptimized;
+  }
+
+  private optimizeCalculations(tokens: Token[], steps: string[]): boolean {
+    let isOptimized = false;
+
+    return isOptimized;
+  }
+
+  private openParenthesis(tokens: Token[], steps: string[]): boolean {
+    let isOptimized = false;
+
+    return isOptimized;
+  }
+
+  private handleDivisionByZero(
+    tokens: Token[],
+    errors: ValidationError[]
+  ): {
+    shouldStop: boolean;
+  } {
+    const { hasDivisionByZero, index } = this.checkDivisionByZero(tokens);
+
+    if (hasDivisionByZero) {
+      errors.push({ message: 'Division by zero', position: index });
+      return { shouldStop: true };
+    }
+
+    return { shouldStop: false };
+  }
+
+  private checkDivisionByZero(tokens: Token[]): {
+    hasDivisionByZero: boolean;
+    index?: number;
+  } {
+    const index = tokens.findIndex((token, index) => {
+      const isDivision =
+        token.type === TokenType.MULTIPLICATION_OPERATOR && token.value === '/';
+
+      if (!isDivision) {
+        return false;
+      }
+
+      const nextToken = tokens[index + 1];
+      const isNextTokenZero =
+        nextToken.type === TokenType.NUMBER && Number(nextToken.value) === 0;
+
+      return isNextTokenZero;
+    });
+
+    return index >= 0
+      ? { hasDivisionByZero: true, index: index }
+      : { hasDivisionByZero: false };
+  }
+
   private optimizeUnaryOperatorBeforeZero(
-    expressionTokens: Token[],
+    tokens: Token[],
     optomizationSteps: string[]
   ): boolean {
     let isOptimized = false;
 
     let i = 0;
 
-    while (expressionTokens[i]) {
-      const token = expressionTokens[i];
-      const prevToken = expressionTokens[i - 1];
-      const tokenBeforeUnary = expressionTokens[i - 2];
+    while (tokens[i]) {
+      const token = tokens[i];
+      const prevToken = tokens[i - 1];
+      const tokenBeforeUnary = tokens[i - 2];
 
       const shouldSkip =
         token.type !== TokenType.NUMBER ||
@@ -67,7 +335,7 @@ export class ExpressionOptimizer {
       let deleteCount = 1;
       let deleteFrom = i - 1;
 
-      const tokenAfterZero = expressionTokens[i + 1];
+      const tokenAfterZero = tokens[i + 1];
 
       const shouldOpenParen =
         tokenBeforeUnary?.type === TokenType.PAREN_OPEN &&
@@ -78,9 +346,9 @@ export class ExpressionOptimizer {
         deleteFrom = i - 2;
       }
 
-      const expBefore = this.tokensToString(expressionTokens);
-      expressionTokens.splice(deleteFrom, deleteCount + 1, token);
-      const expAfter = this.tokensToString(expressionTokens);
+      const expBefore = this.tokensToString(tokens);
+      tokens.splice(deleteFrom, deleteCount + 1, token);
+      const expAfter = this.tokensToString(tokens);
 
       optomizationSteps.push(
         `Оптимізація унарного оператора перед нулем: ${expBefore} = ${expAfter} `
@@ -92,53 +360,6 @@ export class ExpressionOptimizer {
     }
 
     return isOptimized;
-  }
-
-  private optimizeZeros(expressionTokens: Token[], errors: string[]): boolean {
-    console.log('Optimizing zeros');
-    return true;
-  }
-
-  private handleDivisionByZero(expressionTokens: Token[]): {
-    shouldStop: boolean;
-    error?: ValidationError;
-  } {
-    const { hasDivisionByZero, index } =
-      this.checkDivisionByZero(expressionTokens);
-
-    if (hasDivisionByZero) {
-      console.log('Division by zero');
-      return {
-        shouldStop: true,
-        error: { message: 'Division by zero', position: index },
-      };
-    }
-
-    return { shouldStop: false };
-  }
-
-  private checkDivisionByZero(expressionTokens: Token[]): {
-    hasDivisionByZero: boolean;
-    index?: number;
-  } {
-    const index = expressionTokens.findIndex((token, index) => {
-      const isDivision =
-        token.type === TokenType.MULTIPLICATION_OPERATOR && token.value === '/';
-
-      if (!isDivision) {
-        return false;
-      }
-
-      const nextToken = expressionTokens[index + 1];
-      const isNextTokenZero =
-        nextToken.type === TokenType.NUMBER && Number(nextToken.value) === 0;
-
-      return isNextTokenZero;
-    });
-
-    return index >= 0
-      ? { hasDivisionByZero: true, index: index }
-      : { hasDivisionByZero: false };
   }
 
   public tokensToString(tokens: Token[]): string {
