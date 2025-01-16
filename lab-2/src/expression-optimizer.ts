@@ -21,7 +21,7 @@ export class ExpressionOptimizer {
 
     let optimized = true;
 
-    while (optimized && errors.length === 0) {
+    while (optimized && optimizedExpression.length > 1 && errors.length === 0) {
       console.log(
         '\n\nOptimized expression:',
         this.tokensToString(optimizedExpression),
@@ -51,6 +51,10 @@ export class ExpressionOptimizer {
         this.openParenthesis(optimizedExpression, optomizationSteps);
     }
 
+    console.log(
+      'Finnaly optimized expression:',
+      this.tokensToString(optimizedExpression)
+    );
     console.log('Optimization steps:', optomizationSteps);
     console.log('Optimization erros:', errors);
 
@@ -117,11 +121,11 @@ export class ExpressionOptimizer {
       }
 
       // a + b*0 = a + 0
-      const isMultiplicationOnZero =
+      const isMultiplicationByZero =
         prevToken?.type === TokenType.MULTIPLICATION_OPERATOR &&
         prevToken?.value === '*';
 
-      if (isMultiplicationOnZero) {
+      if (isMultiplicationByZero) {
         let deleteCount = 2;
         const firstMultiplierIndex = i - 2;
         let deleteFrom = firstMultiplierIndex;
@@ -151,36 +155,34 @@ export class ExpressionOptimizer {
         return true;
       }
 
-      // b + 0*c = b + 0
-      const isZeroMultiplication =
-        nextToken?.type === TokenType.MULTIPLICATION_OPERATOR &&
-        nextToken?.value === '*';
+      // b + 0*c = b + 0; b + 0/c = b + 0
+      const isZeroMultiplicationOrDivision =
+        nextToken?.type === TokenType.MULTIPLICATION_OPERATOR;
 
-      if (isZeroMultiplication) {
+      if (isZeroMultiplicationOrDivision) {
         let deleteCount = 2;
-        const secondMultiplierIndex = i + 2;
+        const secondOperandIndex = i + 2;
         let deleteFrom = i + 1;
 
-        const secondMultiplier = tokens[secondMultiplierIndex];
+        const secondOperand = tokens[secondOperandIndex];
 
-        if (secondMultiplier?.type === TokenType.PAREN_OPEN) {
+        if (secondOperand?.type === TokenType.PAREN_OPEN) {
           const tokensInParenthesis = this.findTokensInParanthesisLeft(
             tokens,
-            secondMultiplierIndex
+            secondOperandIndex
           );
           deleteCount = tokensInParenthesis.length + 1;
         }
 
         const expBefore = this.tokensToString(tokens);
+        const operation = nextToken?.value === '*' ? 'множення' : 'ділення';
 
         const removed = tokens.splice(deleteFrom, deleteCount);
-
         const expAfter = this.tokensToString(tokens);
-
         const removedStr = this.tokensToString(removed.slice(1));
 
         steps.push(
-          `Оптимізація множення 0 на ${removedStr}: ${expBefore} = ${expAfter}`
+          `Оптимізація ${operation} 0 на ${removedStr}: ${expBefore} = ${expAfter}`
         );
 
         return true;
