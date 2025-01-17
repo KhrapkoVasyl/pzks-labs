@@ -194,68 +194,56 @@ export class ExpressionOptimizer {
     return false;
   }
 
-  private findTokensInParanthesisRight(
-    tokens: Token[],
-    closingParenthesisIndex: number
-  ): Token[] {
-    const result: Token[] = [];
-    let openParensCount = 0;
-
-    for (let i = closingParenthesisIndex; i >= 0; i--) {
-      const token = tokens[i];
-      result.unshift(token);
-
-      if (token.type === TokenType.PAREN_CLOSE) {
-        openParensCount++;
-      } else if (token.type === TokenType.PAREN_OPEN) {
-        openParensCount--;
-
-        if (openParensCount === 0) {
-          return result;
-        }
-      }
-    }
-
-    throw new Error(
-      `Відповідна відкриваюча дужка не знайдена для закриваючої на індексі ${closingParenthesisIndex}. Вираз ${this.tokensToString(
-        tokens
-      )}`
-    );
-  }
-
-  private findTokensInParanthesisLeft(
-    tokens: Token[],
-    openingParenthesisIndex: number
-  ): Token[] {
-    const result: Token[] = [];
-    let openParensCount = 0;
-
-    for (let i = openingParenthesisIndex; i < tokens.length; i++) {
-      const token = tokens[i];
-      result.push(token);
-
-      if (token.type === TokenType.PAREN_OPEN) {
-        openParensCount++;
-      } else if (token.type === TokenType.PAREN_CLOSE) {
-        openParensCount--;
-
-        if (openParensCount === 0) {
-          return result;
-        }
-      }
-    }
-
-    throw new Error(
-      `Відповідна закриваюча дужка не знайдена для відкриваючої на індексі ${openingParenthesisIndex}. Вираз ${this.tokensToString(
-        tokens
-      )}`
-    );
-  }
-
   private optimizeOnes(tokens: Token[], steps: string[]): boolean {
-    let isOptimized = false;
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
 
-    return isOptimized;
+      if (token.type !== TokenType.NUMBER || Number(token.value) !== 1) {
+        continue;
+      }
+
+      const prevToken = tokens[i - 1];
+      const nextToken = tokens[i + 1];
+
+      // a * 1 = a;  a / 1 = a
+      const isMultiplicationOrDivisionByOne =
+        prevToken?.type === TokenType.MULTIPLICATION_OPERATOR &&
+        (prevToken?.value === '*' || prevToken?.value === '/');
+
+      if (isMultiplicationOrDivisionByOne) {
+        const expBefore = this.tokensToString(tokens);
+        const operation = prevToken?.value === '*' ? 'множення' : 'ділення';
+
+        tokens.splice(i - 1, 2);
+
+        const expAfter = this.tokensToString(tokens);
+
+        steps.push(`Оптимізація ${operation} на 1: ${expBefore} = ${expAfter}`);
+
+        return true;
+      }
+
+      // 1 * (a+b+c) = a+b+c
+      const isOneBeforeMultiplication =
+        nextToken?.type === TokenType.MULTIPLICATION_OPERATOR &&
+        nextToken.value === '*';
+
+      if (isOneBeforeMultiplication) {
+        const expBefore = this.tokensToString(tokens);
+
+        tokens.splice(i, 2);
+
+        const expAfter = this.tokensToString(tokens);
+
+        steps.push(
+          `Оптимізація множення 1 на вираз: ${expBefore} = ${expAfter}`
+        );
+
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private optimizeCalculations(tokens: Token[], steps: string[]): boolean {
@@ -366,5 +354,63 @@ export class ExpressionOptimizer {
 
   public tokensToString(tokens: Token[]): string {
     return tokens.map((token) => token.value).join('');
+  }
+
+  private findTokensInParanthesisRight(
+    tokens: Token[],
+    closingParenthesisIndex: number
+  ): Token[] {
+    const result: Token[] = [];
+    let openParensCount = 0;
+
+    for (let i = closingParenthesisIndex; i >= 0; i--) {
+      const token = tokens[i];
+      result.unshift(token);
+
+      if (token.type === TokenType.PAREN_CLOSE) {
+        openParensCount++;
+      } else if (token.type === TokenType.PAREN_OPEN) {
+        openParensCount--;
+
+        if (openParensCount === 0) {
+          return result;
+        }
+      }
+    }
+
+    throw new Error(
+      `Відповідна відкриваюча дужка не знайдена для закриваючої на індексі ${closingParenthesisIndex}. Вираз ${this.tokensToString(
+        tokens
+      )}`
+    );
+  }
+
+  private findTokensInParanthesisLeft(
+    tokens: Token[],
+    openingParenthesisIndex: number
+  ): Token[] {
+    const result: Token[] = [];
+    let openParensCount = 0;
+
+    for (let i = openingParenthesisIndex; i < tokens.length; i++) {
+      const token = tokens[i];
+      result.push(token);
+
+      if (token.type === TokenType.PAREN_OPEN) {
+        openParensCount++;
+      } else if (token.type === TokenType.PAREN_CLOSE) {
+        openParensCount--;
+
+        if (openParensCount === 0) {
+          return result;
+        }
+      }
+    }
+
+    throw new Error(
+      `Відповідна закриваюча дужка не знайдена для відкриваючої на індексі ${openingParenthesisIndex}. Вираз ${this.tokensToString(
+        tokens
+      )}`
+    );
   }
 }
