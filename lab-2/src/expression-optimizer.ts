@@ -11,9 +11,6 @@ export class ExpressionOptimizer {
     let optimizedExpression: Token[] = expressionTokens;
     const errors: ValidationError[] = [];
 
-    // zeros ()
-    // ones
-    // identifiers a-a, a/a
     // calculations
     // parantesis
     // grouping with balancing
@@ -247,9 +244,73 @@ export class ExpressionOptimizer {
   }
 
   private optimizeCalculations(tokens: Token[], steps: string[]): boolean {
-    let isOptimized = false;
+    // Пріоритетно обраховуються операції множення та ділення
+    return (
+      this.optimizeMultiplicationAndDivision(tokens, steps) ||
+      this.optimizeAdditionAndSubtraction(tokens, steps)
+    );
+  }
 
-    return isOptimized;
+  private optimizeMultiplicationAndDivision(
+    tokens: Token[],
+    steps: string[]
+  ): boolean {
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+
+      if (token.type !== TokenType.MULTIPLICATION_OPERATOR) {
+        continue;
+      }
+
+      const prevToken = tokens[i - 1];
+      const nextToken = tokens[i + 1];
+      const beforePrevToken = tokens[i - 2];
+
+      if (
+        prevToken?.type === TokenType.NUMBER &&
+        nextToken?.type === TokenType.NUMBER &&
+        !(
+          beforePrevToken?.type === TokenType.MULTIPLICATION_OPERATOR &&
+          beforePrevToken?.value === '/'
+        )
+      ) {
+        const expBefore = this.tokensToString(tokens);
+
+        const firstOperand = Number(prevToken.value);
+        const secondOperand = Number(nextToken.value);
+
+        const result =
+          token.value === '*'
+            ? firstOperand * secondOperand
+            : firstOperand / secondOperand;
+
+        const operation = token.value === '*' ? 'множення' : 'ділення';
+
+        const removed = tokens.splice(i - 1, 3, {
+          type: TokenType.NUMBER,
+          value: result.toString(),
+          position: prevToken.position,
+        });
+        const removedStr = this.tokensToString(removed);
+
+        const expAfter = this.tokensToString(tokens);
+
+        steps.push(
+          `Обрахунок ${operation}: ${removedStr} = ${result} | Повний вираз: ${expBefore} = ${expAfter}`
+        );
+
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private optimizeAdditionAndSubtraction(
+    tokens: Token[],
+    steps: string[]
+  ): boolean {
+    return false;
   }
 
   private openParenthesis(tokens: Token[], steps: string[]): boolean {
