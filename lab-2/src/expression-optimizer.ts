@@ -1,17 +1,53 @@
 import { Token, TokenType, ValidationError } from './expression-analyzer';
 
+type OptimizationResult = {
+  success: boolean;
+  optimizedExpression: Token[];
+  optomizationSteps: string[];
+  errors: ValidationError[];
+};
+
 export class ExpressionOptimizer {
-  optimize(expressionTokens: Token[]): {
-    success: boolean;
-    optimizedExpression: Token[];
-    optomizationSteps: string[];
-    errors: ValidationError[];
-  } {
+  handleOptimization(expressionTokens: Token[]): OptimizationResult {
+    const expressionStr = this.tokensToString(expressionTokens);
+
+    const result = this.optimize(expressionTokens);
+
+    const optimizedExprStr = this.tokensToString(result.optimizedExpression);
+    const steps = result.optomizationSteps
+      .map((step, index) => `${index + 1}. ${step}`)
+      .join('\n');
+    const errors = result.errors
+      .map((error, index) => `${index + 1}. ${error.message}`)
+      .join('\n');
+
+    const red = '\x1b[31m';
+    const reset = '\x1b[0m';
+    const green = '\x1b[32m';
+
+    let log = '\n==========\n\n';
+    if (result.success) {
+      log += `${green}Успішно оптимізовано вираз:${reset} ${expressionStr}`;
+      log += `\n\nОптимізований вираз: ${optimizedExprStr}`;
+      log += `\n\nКроки оптимізації:\n${steps}`;
+    } else {
+      log += `${red}Помилка при оптимізації виразу:${reset} ${expressionStr}`;
+      log += `\n\nПомилки:\n${errors}`;
+      log += `\n\nКроки оптимізації:\n${steps}`;
+    }
+
+    log += '\n\n==========\n';
+
+    console.log(log);
+
+    return result;
+  }
+
+  optimize(expressionTokens: Token[]): OptimizationResult {
     const optomizationSteps: string[] = [];
     let optimizedExpression: Token[] = expressionTokens;
     const errors: ValidationError[] = [];
 
-    // calculations
     // parantesis
     // grouping with balancing
     // tree
@@ -55,10 +91,10 @@ export class ExpressionOptimizer {
     // (-1+3)+12+(-0)-32
 
     return {
-      success: true,
-      optimizedExpression: optimizedExpression,
+      success: errors.length === 0,
+      optimizedExpression,
       optomizationSteps,
-      errors: [],
+      errors,
     };
   }
 
@@ -451,7 +487,21 @@ export class ExpressionOptimizer {
     const { hasDivisionByZero, index } = this.checkDivisionByZero(tokens);
 
     if (hasDivisionByZero) {
-      errors.push({ message: 'Division by zero', position: index });
+      const red = '\x1b[31m';
+      const reset = '\x1b[0m';
+
+      const highlightedExpression = tokens
+        .map((token, i) => {
+          if (i === index || i === index! + 1) {
+            return `${red}${token.value}${reset}`;
+          }
+          return token.value;
+        })
+        .join('');
+
+      const errorMessage = `Виявлено ділення на нуль на позиції ${index} у виразі: ${highlightedExpression}`;
+
+      errors.push({ message: errorMessage, position: index });
       return { shouldStop: true };
     }
 
