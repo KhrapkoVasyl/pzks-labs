@@ -48,10 +48,7 @@ export class ExpressionOptimizer {
         this.openParenthesis(optimizedExpression, optomizationSteps);
     }
 
-    console.log(
-      'Finnaly optimized expression:',
-      this.tokensToString(optimizedExpression)
-    );
+    console.log('Finnaly optimized expression:', optimizedExpression);
     console.log('Optimization steps:', optomizationSteps);
     console.log('Optimization erros:', errors);
 
@@ -85,7 +82,11 @@ export class ExpressionOptimizer {
           nextToken.type === TokenType.ADDITION_OPERATOR ||
           nextToken.type === TokenType.PAREN_CLOSE);
 
-      if (isSurroundedByAdditionOperators) {
+      const isOnlyZeroInParenthesis =
+        prevToken?.type === TokenType.PAREN_OPEN &&
+        nextToken?.type === TokenType.PAREN_CLOSE;
+
+      if (isSurroundedByAdditionOperators && !isOnlyZeroInParenthesis) {
         const expBefore = this.tokensToString(tokens);
 
         let deleteCount = 1;
@@ -310,6 +311,128 @@ export class ExpressionOptimizer {
     tokens: Token[],
     steps: string[]
   ): boolean {
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+
+      if (token.type !== TokenType.ADDITION_OPERATOR) {
+        continue;
+      }
+
+      const firstOperandToken = tokens[i - 1];
+      const secondOperandToken = tokens[i + 1];
+      const operationBeforeFirstOperandToken = tokens[i - 2];
+      const operationAfterSecondOperandToken = tokens[i + 2];
+      const tokenBeforeOperationBeforeFirstOperandToken = tokens[i - 3];
+
+      const firstOperandSign = operationBeforeFirstOperandToken?.value ?? '+';
+      const secondOperandSign = token?.value;
+
+      const isValidAdditionOfNumbers =
+        firstOperandToken?.type === TokenType.NUMBER &&
+        secondOperandToken?.type === TokenType.NUMBER &&
+        (!operationBeforeFirstOperandToken ||
+          operationBeforeFirstOperandToken.type !==
+            TokenType.MULTIPLICATION_OPERATOR) &&
+        (!operationAfterSecondOperandToken ||
+          operationAfterSecondOperandToken.type !==
+            TokenType.MULTIPLICATION_OPERATOR);
+
+      const isAdditionOfSameIdentifier =
+        firstOperandToken?.type === TokenType.IDENTIFIER &&
+        secondOperandToken?.type === TokenType.IDENTIFIER &&
+        firstOperandToken.value === secondOperandToken.value &&
+        firstOperandSign !== secondOperandSign;
+
+      if (isValidAdditionOfNumbers || isAdditionOfSameIdentifier) {
+        const expBefore = this.tokensToString(tokens);
+
+        const hasSignBefore =
+          operationBeforeFirstOperandToken?.type ===
+          TokenType.ADDITION_OPERATOR;
+        const isSignUnary =
+          !tokenBeforeOperationBeforeFirstOperandToken ||
+          tokenBeforeOperationBeforeFirstOperandToken?.type ===
+            TokenType.PAREN_OPEN;
+
+        let firstOperand;
+        let secondOperand;
+        let result;
+
+        if (isAdditionOfSameIdentifier) {
+          firstOperand =
+            firstOperandSign === '-'
+              ? `${firstOperandSign}${firstOperandToken.value}`
+              : firstOperandToken.value;
+          secondOperand = `${secondOperandToken.value}`;
+          result = 0;
+        } else {
+          firstOperand =
+            operationBeforeFirstOperandToken?.value === '-'
+              ? -Number(firstOperandToken.value)
+              : Number(firstOperandToken.value);
+
+          secondOperand = Number(secondOperandToken.value);
+
+          result =
+            token.value === '+'
+              ? firstOperand + secondOperand
+              : firstOperand - secondOperand;
+        }
+
+        const operation = token.value === '+' ? 'додавання' : 'віднімання';
+
+        const tokensToAdd: Token[] = [
+          {
+            type: TokenType.NUMBER,
+            value: Math.abs(result).toString(),
+            position: firstOperandToken.position,
+          },
+        ];
+
+        let deleteFrom = i - 1;
+        let deleteCount = 3;
+
+        if (!hasSignBefore && result < 0) {
+          tokensToAdd.unshift({
+            type: TokenType.ADDITION_OPERATOR,
+            value: '-',
+            position: firstOperandToken.position,
+          });
+
+          deleteFrom = i - 1;
+          deleteCount = 3;
+        }
+
+        if (hasSignBefore && isSignUnary) {
+          if (result < 0) {
+            tokensToAdd.unshift({
+              type: TokenType.ADDITION_OPERATOR,
+              value: '-',
+              position: firstOperandToken.position,
+            });
+          }
+
+          deleteFrom = i - 2;
+          deleteCount = 4;
+        }
+
+        if (hasSignBefore && !isSignUnary) {
+          operationBeforeFirstOperandToken.value = result < 0 ? '-' : '+';
+          deleteFrom = i - 1;
+          deleteCount = 3;
+        }
+
+        tokens.splice(deleteFrom, deleteCount, ...tokensToAdd);
+        const expAfter = this.tokensToString(tokens);
+
+        steps.push(
+          `Обрахунок ${operation}: ${firstOperand}${token.value}${secondOperand} = ${result} | Повний вираз: ${expBefore} = ${expAfter}`
+        );
+
+        return true;
+      }
+    }
+
     return false;
   }
 
