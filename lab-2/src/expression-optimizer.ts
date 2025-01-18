@@ -81,7 +81,7 @@ export class ExpressionOptimizer {
         this.optimizeZeros(optimizedExpression, optomizationSteps) ||
         this.optimizeOnes(optimizedExpression, optomizationSteps) ||
         this.optimizeCalculations(optimizedExpression, optomizationSteps) ||
-        this.openParenthesis(optimizedExpression, optomizationSteps);
+        this.openParentheses(optimizedExpression, optomizationSteps);
     }
 
     console.log('Finnaly optimized expression:', optimizedExpression);
@@ -360,7 +360,10 @@ export class ExpressionOptimizer {
       const operationAfterSecondOperandToken = tokens[i + 2];
       const tokenBeforeOperationBeforeFirstOperandToken = tokens[i - 3];
 
-      const firstOperandSign = operationBeforeFirstOperandToken?.value ?? '+';
+      const firstOperandSign =
+        operationBeforeFirstOperandToken?.type === TokenType.ADDITION_OPERATOR
+          ? operationBeforeFirstOperandToken.value
+          : '+';
       const secondOperandSign = token?.value;
 
       const isValidAdditionOfNumbers =
@@ -472,10 +475,136 @@ export class ExpressionOptimizer {
     return false;
   }
 
-  private openParenthesis(tokens: Token[], steps: string[]): boolean {
-    let isOptimized = false;
+  private openParentheses(tokens: Token[], steps: string[]): boolean {
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
 
-    return isOptimized;
+      if (token.type === TokenType.PAREN_OPEN) {
+        const tokensInParenthesis = this.findTokensInParanthesisLeft(tokens, i);
+        const parentStr = this.tokensToString(tokensInParenthesis);
+
+        const innerTokens = tokensInParenthesis.slice(1, -1);
+
+        if (innerTokens.some((t) => t.type === TokenType.PAREN_OPEN)) {
+          continue; // шукаємо найбільш вкладені дужки
+        }
+
+        const prevToken = tokens[i - 1];
+        const expBefore = this.tokensToString(tokens);
+
+        // Обрахунок випадків, коли перед дужками стоїть оператор множення або ділення
+        if (prevToken?.type === TokenType.MULTIPLICATION_OPERATOR) {
+          const operands = innerTokens.filter(
+            (t) =>
+              t.type === TokenType.NUMBER || t.type === TokenType.IDENTIFIER
+          ).length;
+
+          if (operands > 1) {
+            continue;
+          }
+
+          const countOfInnerTokens = innerTokens.length;
+
+          const hasUnarySign =
+            countOfInnerTokens === 2 &&
+            innerTokens[0].type === TokenType.ADDITION_OPERATOR;
+
+          const singleOperand = hasUnarySign ? innerTokens[1] : innerTokens[0];
+          let deleteFrom = i;
+
+          if (hasUnarySign && innerTokens[0].value === '+') {
+            innerTokens.shift();
+          }
+
+          if (hasUnarySign && innerTokens[0].value === '-') {
+            for (
+              let prevAdditionOrParenOpenIndex = i - 1;
+              prevAdditionOrParenOpenIndex >= 0;
+              prevAdditionOrParenOpenIndex--
+            ) {
+              const prevToken = tokens[prevAdditionOrParenOpenIndex];
+              if (prevToken.type === TokenType.ADDITION_OPERATOR) {
+                if (
+                  prevAdditionOrParenOpenIndex === 0 &&
+                  prevToken.value === '-'
+                ) {
+                  tokens.splice(prevAdditionOrParenOpenIndex, 1);
+                  deleteFrom--;
+                  break;
+                }
+
+                prevToken.value = prevToken.value === '+' ? '-' : '+';
+                break;
+              }
+
+              if (
+                prevToken.type === TokenType.PAREN_OPEN ||
+                prevAdditionOrParenOpenIndex === 0
+              ) {
+                const addToPosition =
+                  prevAdditionOrParenOpenIndex === 0
+                    ? 0
+                    : prevAdditionOrParenOpenIndex + 1;
+                tokens.splice(addToPosition, 0, {
+                  type: TokenType.ADDITION_OPERATOR,
+                  value: '-',
+                  position: prevAdditionOrParenOpenIndex,
+                });
+
+                deleteFrom++;
+                break;
+              }
+            }
+          }
+
+          tokens.splice(deleteFrom, countOfInnerTokens + 2, singleOperand);
+          const expAfter = this.tokensToString(tokens);
+
+          steps.push(
+            `Відкрито дужки: ${parentStr} | Вираз ${expBefore} = ${expAfter}`
+          );
+          return true;
+        }
+
+        // Обрахунок випадків, коли перед дужками стоїть оператор віднімання або додавання
+        // if (!prevToken || prevToken.type === TokenType.ADDITION_OPERATOR) {
+        //   const isNegative = prevToken?.value === '-';
+
+        //   if (isNegative) {
+        //     for (const innerToken of innerTokens) {
+        //       if (innerToken.type === TokenType.ADDITION_OPERATOR) {
+        //         innerToken.value = innerToken.value === '+' ? '-' : '+';
+        //       }
+        //     }
+        //   }
+
+        //   tokens.splice(
+        //     i - (prevToken ? 1 : 0),
+        //     innerTokens.length + 2,
+        //     ...innerTokens
+        //   );
+        //   const expAfter = this.tokensToString(tokens);
+
+        //   steps.push(
+        //     `Opened parentheses with operator + or -: ${expBefore} = ${expAfter}`
+        //   );
+        //   return true;
+        // }
+
+        // Обрахунок з відсутністю оператора перед дужками
+        if (!prevToken || prevToken.type === TokenType.PAREN_OPEN) {
+          tokens.splice(i, innerTokens.length + 2, ...innerTokens);
+          const expAfter = this.tokensToString(tokens);
+
+          steps.push(
+            `Відкрито дужки: ${parentStr} | Вираз ${expBefore} = ${expAfter}`
+          );
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   private handleDivisionByZero(
