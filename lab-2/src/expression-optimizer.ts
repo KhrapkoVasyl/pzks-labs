@@ -29,7 +29,9 @@ export class ExpressionOptimizer {
     if (result.success) {
       log += `${green}Успішно оптимізовано вираз:${reset} ${expressionStr}`;
       log += `\n\nОптимізований вираз: ${optimizedExprStr}`;
-      log += `\n\nКроки оптимізації:\n${steps}`;
+      log += steps.length
+        ? `\n\nКроки оптимізації:\n${steps}`
+        : '\n\nЖодного можливого оптимізаційного кроку не знайдено.\n\n';
     } else {
       log += `${red}Помилка при оптимізації виразу:${reset} ${expressionStr}`;
       log += `\n\nПомилки:\n${errors}`;
@@ -123,7 +125,7 @@ export class ExpressionOptimizer {
         nextToken?.type === TokenType.PAREN_CLOSE;
 
       if (isSurroundedByAdditionOperators && !isOnlyZeroInParenthesis) {
-        const expBefore = this.tokensToString(tokens);
+        const expBefore = tokens.slice();
 
         let deleteCount = 1;
         let deleteFrom = i;
@@ -147,8 +149,19 @@ export class ExpressionOptimizer {
         tokens.splice(deleteFrom, deleteCount);
         const expAfter = this.tokensToString(tokens);
 
+        const green = '\x1b[32m';
+        const reset = '\x1b[0m';
+
+        const formattedExpBefore = expBefore.map((token, index) => {
+          if (index === i) {
+            token.value = `${green}${token.value}${reset}`;
+          }
+          return token;
+        });
+        const expBeforeStr = this.tokensToString(formattedExpBefore);
+
         steps.push(
-          `Оптимізація додавання/віднімання з нулем: ${expBefore} = ${expAfter}`
+          `Оптимізація додавання/віднімання з нулем: ${expBeforeStr} = ${expAfter}`
         );
 
         return true;
@@ -244,15 +257,27 @@ export class ExpressionOptimizer {
         prevToken?.type === TokenType.MULTIPLICATION_OPERATOR &&
         (prevToken?.value === '*' || prevToken?.value === '/');
 
+      const expBefore = tokens.slice();
+      const green = '\x1b[32m';
+      const reset = '\x1b[0m';
+
       if (isMultiplicationOrDivisionByOne) {
-        const expBefore = this.tokensToString(tokens);
+        const formattedExpBefore = expBefore.map((token, index) => {
+          if (index === i) {
+            token.value = `${green}${token.value}${reset}`;
+          }
+          return token;
+        });
+        const expBeforeStr = this.tokensToString(formattedExpBefore);
         const operation = prevToken?.value === '*' ? 'множення' : 'ділення';
 
         tokens.splice(i - 1, 2);
 
         const expAfter = this.tokensToString(tokens);
 
-        steps.push(`Оптимізація ${operation} на 1: ${expBefore} = ${expAfter}`);
+        steps.push(
+          `Оптимізація ${operation} на 1: ${expBeforeStr} = ${expAfter}`
+        );
 
         return true;
       }
@@ -263,14 +288,19 @@ export class ExpressionOptimizer {
         nextToken.value === '*';
 
       if (isOneBeforeMultiplication) {
-        const expBefore = this.tokensToString(tokens);
-
+        const formattedExpBefore = expBefore.map((token, index) => {
+          if (index === i) {
+            token.value = `${green}${token.value}${reset}`;
+          }
+          return token;
+        });
+        const expBeforeStr = this.tokensToString(formattedExpBefore);
         tokens.splice(i, 2);
 
         const expAfter = this.tokensToString(tokens);
 
         steps.push(
-          `Оптимізація множення 1 на вираз: ${expBefore} = ${expAfter}`
+          `Оптимізація множення 1 на вираз: ${expBeforeStr} = ${expAfter}`
         );
 
         return true;
@@ -366,9 +396,7 @@ export class ExpressionOptimizer {
           : '+';
       const secondOperandSign = token?.value;
 
-      const isValidAdditionOfNumbers =
-        firstOperandToken?.type === TokenType.NUMBER &&
-        secondOperandToken?.type === TokenType.NUMBER &&
+      const canPerformAddition =
         (!operationBeforeFirstOperandToken ||
           operationBeforeFirstOperandToken.type !==
             TokenType.MULTIPLICATION_OPERATOR) &&
@@ -376,13 +404,20 @@ export class ExpressionOptimizer {
           operationAfterSecondOperandToken.type !==
             TokenType.MULTIPLICATION_OPERATOR);
 
+      const isValidAdditionOfNumbers =
+        firstOperandToken?.type === TokenType.NUMBER &&
+        secondOperandToken?.type === TokenType.NUMBER;
+
       const isAdditionOfSameIdentifier =
         firstOperandToken?.type === TokenType.IDENTIFIER &&
         secondOperandToken?.type === TokenType.IDENTIFIER &&
         firstOperandToken.value === secondOperandToken.value &&
         firstOperandSign !== secondOperandSign;
 
-      if (isValidAdditionOfNumbers || isAdditionOfSameIdentifier) {
+      if (
+        canPerformAddition &&
+        (isValidAdditionOfNumbers || isAdditionOfSameIdentifier)
+      ) {
         const expBefore = this.tokensToString(tokens);
 
         const hasSignBefore =
@@ -567,29 +602,46 @@ export class ExpressionOptimizer {
         }
 
         // Обрахунок випадків, коли перед дужками стоїть оператор віднімання або додавання
-        // if (!prevToken || prevToken.type === TokenType.ADDITION_OPERATOR) {
-        //   const isNegative = prevToken?.value === '-';
+        if (prevToken?.type === TokenType.ADDITION_OPERATOR) {
+          const isNegative = prevToken?.value === '-';
 
-        //   if (isNegative) {
-        //     for (const innerToken of innerTokens) {
-        //       if (innerToken.type === TokenType.ADDITION_OPERATOR) {
-        //         innerToken.value = innerToken.value === '+' ? '-' : '+';
-        //       }
-        //     }
-        //   }
+          if (isNegative) {
+            for (const innerToken of innerTokens) {
+              if (innerToken.type === TokenType.ADDITION_OPERATOR) {
+                innerToken.value = innerToken.value === '+' ? '-' : '+';
+              }
+            }
+          }
 
-        //   tokens.splice(
-        //     i - (prevToken ? 1 : 0),
-        //     innerTokens.length + 2,
-        //     ...innerTokens
-        //   );
-        //   const expAfter = this.tokensToString(tokens);
+          let deleteFrom = i - 1;
+          let deleteCount = innerTokens.length + 3;
 
-        //   steps.push(
-        //     `Opened parentheses with operator + or -: ${expBefore} = ${expAfter}`
-        //   );
-        //   return true;
-        // }
+          const firstInnerToken = innerTokens[0];
+
+          if (firstInnerToken?.type !== TokenType.ADDITION_OPERATOR) {
+            deleteFrom = i;
+            deleteCount--;
+          }
+
+          if (
+            deleteFrom === 0 &&
+            firstInnerToken?.type === TokenType.ADDITION_OPERATOR &&
+            firstInnerToken.value === '+'
+          ) {
+            innerTokens.shift();
+          }
+
+          tokens.splice(deleteFrom, deleteCount, ...innerTokens);
+
+          const expAfter = this.tokensToString(tokens);
+
+          const operatorStr = isNegative ? '"-" (інвертовано знаки)' : '"+"';
+          steps.push(
+            `Відкрито дужки після ${operatorStr}: ${parentStr} | Вираз ${expBefore} = ${expAfter}`
+          );
+
+          return true;
+        }
 
         // Обрахунок з відсутністю оператора перед дужками
         if (!prevToken || prevToken.type === TokenType.PAREN_OPEN) {
