@@ -1,4 +1,9 @@
 import { Token, TokenType, ValidationError } from './expression-analyzer';
+import {
+  findTokensInParanthesisLeft,
+  findTokensInParanthesisRight,
+  tokensToString,
+} from './utils';
 
 type OptimizationResult = {
   success: boolean;
@@ -9,11 +14,11 @@ type OptimizationResult = {
 
 export class ExpressionOptimizer {
   handleOptimization(expressionTokens: Token[]): OptimizationResult {
-    const expressionStr = this.tokensToString(expressionTokens);
+    const expressionStr = tokensToString(expressionTokens);
 
     const result = this.optimize(expressionTokens);
 
-    const optimizedExprStr = this.tokensToString(result.optimizedExpression);
+    const optimizedExprStr = tokensToString(result.optimizedExpression);
     const steps = result.optomizationSteps
       .map((step, index) => `${index + 1}. ${step}`)
       .join('\n');
@@ -85,16 +90,6 @@ export class ExpressionOptimizer {
     };
   }
 
-    // (-1+3)+12+(-0)-32
-
-    return {
-      success: errors.length === 0,
-      optimizedExpression,
-      optomizationSteps,
-      errors,
-    };
-  }
-
   private optimizeZeros(tokens: Token[], steps: string[]): boolean {
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
@@ -142,7 +137,7 @@ export class ExpressionOptimizer {
         }
 
         tokens.splice(deleteFrom, deleteCount);
-        const expAfter = this.tokensToString(tokens);
+        const expAfter = tokensToString(tokens);
 
         const green = '\x1b[32m';
         const reset = '\x1b[0m';
@@ -153,7 +148,7 @@ export class ExpressionOptimizer {
           }
           return token;
         });
-        const expBeforeStr = this.tokensToString(formattedExpBefore);
+        const expBeforeStr = tokensToString(formattedExpBefore);
 
         steps.push(
           `Оптимізація додавання/віднімання з нулем: ${expBeforeStr} = ${expAfter}`
@@ -174,7 +169,7 @@ export class ExpressionOptimizer {
         const firstMultiplier = tokens[firstMultiplierIndex];
 
         if (firstMultiplier?.type === TokenType.PAREN_CLOSE) {
-          const tokensInParenthesis = this.findTokensInParanthesisRight(
+          const tokensInParenthesis = findTokensInParanthesisRight(
             tokens,
             firstMultiplierIndex
           );
@@ -182,13 +177,13 @@ export class ExpressionOptimizer {
           deleteFrom = i - deleteCount;
         }
 
-        const expBefore = this.tokensToString(tokens);
+        const expBefore = tokensToString(tokens);
 
         const removed = tokens.splice(deleteFrom, deleteCount);
 
-        const expAfter = this.tokensToString(tokens);
+        const expAfter = tokensToString(tokens);
 
-        const removedStr = this.tokensToString(removed.slice(0, -1));
+        const removedStr = tokensToString(removed.slice(0, -1));
 
         steps.push(
           `Оптимізація множення ${removedStr} на 0: ${expBefore} = ${expAfter}`
@@ -209,19 +204,19 @@ export class ExpressionOptimizer {
         const secondOperand = tokens[secondOperandIndex];
 
         if (secondOperand?.type === TokenType.PAREN_OPEN) {
-          const tokensInParenthesis = this.findTokensInParanthesisLeft(
+          const tokensInParenthesis = findTokensInParanthesisLeft(
             tokens,
             secondOperandIndex
           );
           deleteCount = tokensInParenthesis.length + 1;
         }
 
-        const expBefore = this.tokensToString(tokens);
+        const expBefore = tokensToString(tokens);
         const operation = nextToken?.value === '*' ? 'множення' : 'ділення';
 
         const removed = tokens.splice(deleteFrom, deleteCount);
-        const expAfter = this.tokensToString(tokens);
-        const removedStr = this.tokensToString(removed.slice(1));
+        const expAfter = tokensToString(tokens);
+        const removedStr = tokensToString(removed.slice(1));
 
         steps.push(
           `Оптимізація ${operation} 0 на ${removedStr}: ${expBefore} = ${expAfter}`
@@ -263,12 +258,12 @@ export class ExpressionOptimizer {
           }
           return token;
         });
-        const expBeforeStr = this.tokensToString(formattedExpBefore);
+        const expBeforeStr = tokensToString(formattedExpBefore);
         const operation = prevToken?.value === '*' ? 'множення' : 'ділення';
 
         tokens.splice(i - 1, 2);
 
-        const expAfter = this.tokensToString(tokens);
+        const expAfter = tokensToString(tokens);
 
         steps.push(
           `Оптимізація ${operation} на 1: ${expBeforeStr} = ${expAfter}`
@@ -289,10 +284,10 @@ export class ExpressionOptimizer {
           }
           return token;
         });
-        const expBeforeStr = this.tokensToString(formattedExpBefore);
+        const expBeforeStr = tokensToString(formattedExpBefore);
         tokens.splice(i, 2);
 
-        const expAfter = this.tokensToString(tokens);
+        const expAfter = tokensToString(tokens);
 
         steps.push(
           `Оптимізація множення 1 на вираз: ${expBeforeStr} = ${expAfter}`
@@ -336,7 +331,7 @@ export class ExpressionOptimizer {
           beforePrevToken?.value === '/'
         )
       ) {
-        const expBefore = this.tokensToString(tokens);
+        const expBefore = tokensToString(tokens);
 
         const firstOperand = Number(prevToken.value);
         const secondOperand = Number(nextToken.value);
@@ -353,9 +348,9 @@ export class ExpressionOptimizer {
           value: result.toString(),
           position: prevToken.position,
         });
-        const removedStr = this.tokensToString(removed);
+        const removedStr = tokensToString(removed);
 
-        const expAfter = this.tokensToString(tokens);
+        const expAfter = tokensToString(tokens);
 
         steps.push(
           `Обрахунок ${operation}: ${removedStr} = ${result} | Повний вираз: ${expBefore} = ${expAfter}`
@@ -413,7 +408,7 @@ export class ExpressionOptimizer {
         canPerformAddition &&
         (isValidAdditionOfNumbers || isAdditionOfSameIdentifier)
       ) {
-        const expBefore = this.tokensToString(tokens);
+        const expBefore = tokensToString(tokens);
 
         const hasSignBefore =
           operationBeforeFirstOperandToken?.type ===
@@ -492,7 +487,7 @@ export class ExpressionOptimizer {
         }
 
         tokens.splice(deleteFrom, deleteCount, ...tokensToAdd);
-        const expAfter = this.tokensToString(tokens);
+        const expAfter = tokensToString(tokens);
 
         steps.push(
           `Обрахунок ${operation}: ${firstOperand}${token.value}${secondOperand} = ${result} | Повний вираз: ${expBefore} = ${expAfter}`
@@ -510,8 +505,8 @@ export class ExpressionOptimizer {
       const token = tokens[i];
 
       if (token.type === TokenType.PAREN_OPEN) {
-        const tokensInParenthesis = this.findTokensInParanthesisLeft(tokens, i);
-        const parentStr = this.tokensToString(tokensInParenthesis);
+        const tokensInParenthesis = findTokensInParanthesisLeft(tokens, i);
+        const parentStr = tokensToString(tokensInParenthesis);
 
         const innerTokens = tokensInParenthesis.slice(1, -1);
 
@@ -520,7 +515,7 @@ export class ExpressionOptimizer {
         }
 
         const prevToken = tokens[i - 1];
-        const expBefore = this.tokensToString(tokens);
+        const expBefore = tokensToString(tokens);
 
         // Обрахунок випадків, коли перед дужками стоїть оператор множення або ділення
         if (prevToken?.type === TokenType.MULTIPLICATION_OPERATOR) {
@@ -588,7 +583,7 @@ export class ExpressionOptimizer {
           }
 
           tokens.splice(deleteFrom, countOfInnerTokens + 2, singleOperand);
-          const expAfter = this.tokensToString(tokens);
+          const expAfter = tokensToString(tokens);
 
           steps.push(
             `Відкрито дужки: ${parentStr} | Вираз ${expBefore} = ${expAfter}`
@@ -628,7 +623,7 @@ export class ExpressionOptimizer {
 
           tokens.splice(deleteFrom, deleteCount, ...innerTokens);
 
-          const expAfter = this.tokensToString(tokens);
+          const expAfter = tokensToString(tokens);
 
           const operatorStr = isNegative ? '"-" (інвертовано знаки)' : '"+"';
           steps.push(
@@ -641,7 +636,7 @@ export class ExpressionOptimizer {
         // Обрахунок з відсутністю оператора перед дужками
         if (!prevToken || prevToken.type === TokenType.PAREN_OPEN) {
           tokens.splice(i, innerTokens.length + 2, ...innerTokens);
-          const expAfter = this.tokensToString(tokens);
+          const expAfter = tokensToString(tokens);
 
           steps.push(
             `Відкрито дужки: ${parentStr} | Вираз ${expBefore} = ${expAfter}`
@@ -746,9 +741,9 @@ export class ExpressionOptimizer {
         deleteFrom = i - 2;
       }
 
-      const expBefore = this.tokensToString(tokens);
+      const expBefore = tokensToString(tokens);
       tokens.splice(deleteFrom, deleteCount + 1, token);
-      const expAfter = this.tokensToString(tokens);
+      const expAfter = tokensToString(tokens);
 
       optomizationSteps.push(
         `Оптимізація унарного оператора перед нулем: ${expBefore} = ${expAfter} `
@@ -760,67 +755,5 @@ export class ExpressionOptimizer {
     }
 
     return isOptimized;
-  }
-
-  public tokensToString(tokens: Token[]): string {
-    return tokens.map((token) => token.value).join('');
-  }
-
-  private findTokensInParanthesisRight(
-    tokens: Token[],
-    closingParenthesisIndex: number
-  ): Token[] {
-    const result: Token[] = [];
-    let openParensCount = 0;
-
-    for (let i = closingParenthesisIndex; i >= 0; i--) {
-      const token = tokens[i];
-      result.unshift(token);
-
-      if (token.type === TokenType.PAREN_CLOSE) {
-        openParensCount++;
-      } else if (token.type === TokenType.PAREN_OPEN) {
-        openParensCount--;
-
-        if (openParensCount === 0) {
-          return result;
-        }
-      }
-    }
-
-    throw new Error(
-      `Відповідна відкриваюча дужка не знайдена для закриваючої на індексі ${closingParenthesisIndex}. Вираз ${this.tokensToString(
-        tokens
-      )}`
-    );
-  }
-
-  private findTokensInParanthesisLeft(
-    tokens: Token[],
-    openingParenthesisIndex: number
-  ): Token[] {
-    const result: Token[] = [];
-    let openParensCount = 0;
-
-    for (let i = openingParenthesisIndex; i < tokens.length; i++) {
-      const token = tokens[i];
-      result.push(token);
-
-      if (token.type === TokenType.PAREN_OPEN) {
-        openParensCount++;
-      } else if (token.type === TokenType.PAREN_CLOSE) {
-        openParensCount--;
-
-        if (openParensCount === 0) {
-          return result;
-        }
-      }
-    }
-
-    throw new Error(
-      `Відповідна закриваюча дужка не знайдена для відкриваючої на індексі ${openingParenthesisIndex}. Вираз ${this.tokensToString(
-        tokens
-      )}`
-    );
   }
 }
