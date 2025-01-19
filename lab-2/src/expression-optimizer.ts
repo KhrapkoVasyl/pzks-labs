@@ -50,24 +50,15 @@ export class ExpressionOptimizer {
     let optimizedExpression: Token[] = expressionTokens;
     const errors: ValidationError[] = [];
 
-    // parantesis
-    // grouping with balancing
-    // tree
-
     let optimized = true;
 
     while (optimized && optimizedExpression.length > 1 && errors.length === 0) {
-      console.log(
-        '\n\nOptimized expression:',
-        this.tokensToString(optimizedExpression),
-        '\n\n'
-      );
       optimized = false;
 
       optimized = this.optimizeUnaryOperatorBeforeZero(
         optimizedExpression,
         optomizationSteps
-      ); // (-0)-32 = 0-32
+      );
 
       const { shouldStop } = this.handleDivisionByZero(
         optimizedExpression,
@@ -86,9 +77,13 @@ export class ExpressionOptimizer {
         this.openParentheses(optimizedExpression, optomizationSteps);
     }
 
-    console.log('Finnaly optimized expression:', optimizedExpression);
-    console.log('Optimization steps:', optomizationSteps);
-    console.log('Optimization erros:', errors);
+    return {
+      success: errors.length === 0,
+      optimizedExpression,
+      optomizationSteps,
+      errors,
+    };
+  }
 
     // (-1+3)+12+(-0)-32
 
