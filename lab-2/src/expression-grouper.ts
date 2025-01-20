@@ -7,31 +7,48 @@ type GroupingResult = {
 };
 
 export class ExpressionGrouper {
-  groupTokens(expressionTokens: Token[]): GroupingResult {
-    const groupingSteps: string[] = [];
+  groupTokens(expressionTokens: Token[], steps: string[] = []): GroupingResult {
+    this.groupParentheses(expressionTokens, steps);
 
     let isGrouped = true;
 
     while (isGrouped) {
-      isGrouped = this.groupMultiplicationAndDivision(
-        expressionTokens,
-        groupingSteps
-      );
+      isGrouped = this.groupMultiplicationAndDivision(expressionTokens, steps);
     }
 
     isGrouped = true;
 
     while (isGrouped) {
-      isGrouped = this.groupAdditionAndSubtraction(
-        expressionTokens,
-        groupingSteps
-      );
+      isGrouped = this.groupAdditionAndSubtraction(expressionTokens, steps);
     }
 
     return {
       groupedExpression: expressionTokens,
-      groupingSteps,
+      groupingSteps: steps,
     };
+  }
+
+  private groupParentheses(tokens: Token[], steps: string[]): boolean {
+    let groupingDone = false;
+
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+
+      if (token.type === TokenType.PAREN_OPEN) {
+        const group = findTokensInParanthesisLeft(tokens, i);
+
+        const innerTokens = group.slice(1, -1);
+        this.groupTokens(innerTokens, steps);
+
+        tokens.splice(i, group.length, ...innerTokens);
+
+        i -= group.length - innerTokens.length - 1;
+
+        groupingDone = true;
+      }
+    }
+
+    return groupingDone;
   }
 
   private groupMultiplicationAndDivision(
@@ -116,7 +133,7 @@ export class ExpressionGrouper {
           ]);
 
           steps.push(
-            `Групування: ${beforeGroupping} = ${afterGroupping} | Повний вираз: ${expBefore} = ${expAfter}}`
+            `Групування: ${beforeGroupping} = ${afterGroupping} | Повний вираз: ${expBefore} = ${expAfter}`
           );
 
           groupingDone = true;
@@ -222,7 +239,7 @@ export class ExpressionGrouper {
           ]);
 
           steps.push(
-            `Групування: ${beforeGroupping} = ${afterGroupping} | Повний вираз: ${expBefore} = ${expAfter}}`
+            `Групування: ${beforeGroupping} = ${afterGroupping} | Повний вираз: ${expBefore} = ${expAfter}`
           );
 
           groupingDone = true;
