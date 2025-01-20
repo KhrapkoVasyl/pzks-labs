@@ -7,6 +7,26 @@ type GroupingResult = {
 };
 
 export class ExpressionGrouper {
+  handleGroupTokens(expressionTokens: Token[]): GroupingResult {
+    const result = this.groupTokens(expressionTokens);
+
+    const { groupedExpression, groupingSteps } = result;
+
+    const steps = result.groupingSteps
+      .map((step, index) => `${index + 1}. ${step}`)
+      .join('\n');
+    const expression = tokensToString(groupedExpression);
+
+    let log = `Згруповано вираз: ${expression}`;
+    log += steps.length
+      ? `\n\nКроки групування:\n${steps}`
+      : '\n\nЖодного можливого кроку групування не знайдено.\n\n';
+
+    console.log(log);
+
+    return result;
+  }
+
   groupTokens(expressionTokens: Token[], steps: string[] = []): GroupingResult {
     this.groupParentheses(expressionTokens, steps);
 

@@ -30,7 +30,7 @@ export class ExpressionOptimizer {
     const reset = '\x1b[0m';
     const green = '\x1b[32m';
 
-    let log = '\n==========\n\n';
+    let log = '\n==========\n';
     if (result.success) {
       log += `${green}Успішно оптимізовано вираз:${reset} ${expressionStr}`;
       log += `\n\nОптимізований вираз: ${optimizedExprStr}`;
@@ -43,7 +43,7 @@ export class ExpressionOptimizer {
       log += `\n\nКроки оптимізації:\n${steps}`;
     }
 
-    log += '\n\n==========\n';
+    log += '\n==========\n';
 
     console.log(log);
 
