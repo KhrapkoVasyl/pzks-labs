@@ -132,10 +132,12 @@ export class TreeBuilder {
     }
   }
 
-  processAndLogTree(tokens: Token[]): void {
+  handleTree(tokens: Token[]): void {
     const postfixTokens = this.toPostfix(tokens);
 
     const tree = this.build(postfixTokens);
+
+    console.log('\n====== Дерево виразу ======\n');
     this.logTree(tree);
   }
 }
