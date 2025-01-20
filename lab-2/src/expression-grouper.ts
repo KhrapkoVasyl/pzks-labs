@@ -28,6 +28,10 @@ export class ExpressionGrouper {
   }
 
   groupTokens(expressionTokens: Token[], steps: string[] = []): GroupingResult {
+    if (expressionTokens.length === 1 || expressionTokens.length === 2) {
+      return { groupedExpression: expressionTokens, groupingSteps: steps };
+    }
+
     this.groupParentheses(expressionTokens, steps);
 
     let isGrouped = true;
