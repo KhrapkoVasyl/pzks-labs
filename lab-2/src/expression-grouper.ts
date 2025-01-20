@@ -77,6 +77,10 @@ export class ExpressionGrouper {
   ): boolean {
     let groupingDone = false;
 
+    let hasUnaryOperator = false;
+    let shouldReturnUnaryOperator = true;
+    let useUnaryOperator = false;
+
     let firstOperand: Token[] | undefined;
     let firstOperandIndex: number | undefined;
 
@@ -87,6 +91,9 @@ export class ExpressionGrouper {
     if (tokens[0].type === TokenType.ADDITION_OPERATOR) {
       unaryOperator = tokens[0];
       tokens.splice(0, 1);
+
+      hasUnaryOperator = true;
+      useUnaryOperator = true;
     }
 
     for (let i = 0; i < tokens.length; i++) {
@@ -98,19 +105,23 @@ export class ExpressionGrouper {
 
       if (isUngroupedOperand || isGrouppedOperand) {
         const operandTokens = isUngroupedOperand
-          ? [...((unaryOperator ? [unaryOperator] : []) as Token[]), token]
+          ? [...((useUnaryOperator ? [unaryOperator] : []) as Token[]), token]
           : findTokensInParanthesisLeft(tokens, i);
-        unaryOperator = undefined;
+
+        const shift = useUnaryOperator ? 1 : 0;
+        useUnaryOperator = false;
 
         if (!firstOperand) {
           firstOperand = operandTokens;
           firstOperandIndex = i;
-          i += operandTokens.length - 1;
+
+          i += operandTokens.length - shift - 1;
         } else {
           const secondOperand = operandTokens;
           const secondOperandIndex = i;
 
           const expBefore = tokensToString(tokens);
+
           const beforeGroupping = tokensToString([
             ...((operatorBefore ? [operatorBefore] : []) as Token[]),
             ...firstOperand!,
@@ -164,14 +175,19 @@ export class ExpressionGrouper {
           operatorBetween = undefined;
         }
       } else if (token.type === TokenType.ADDITION_OPERATOR) {
-        if (firstOperand) {
-          firstOperand = undefined;
-        }
-
+        firstOperand = undefined;
         operatorBefore = token;
+
+        if (!groupingDone) {
+          shouldReturnUnaryOperator = true;
+        }
       } else if (token.type === TokenType.MULTIPLICATION_OPERATOR) {
         !firstOperand ? (operatorBefore = token) : (operatorBetween = token);
       }
+    }
+
+    if (hasUnaryOperator && shouldReturnUnaryOperator) {
+      tokens.unshift(unaryOperator!);
     }
 
     return groupingDone;
@@ -206,12 +222,14 @@ export class ExpressionGrouper {
         const operandTokens = isUngroupedOperand
           ? [...((unaryOperator ? [unaryOperator] : []) as Token[]), token]
           : findTokensInParanthesisLeft(tokens, i);
+
+        const shift = unaryOperator ? 1 : 0;
         unaryOperator = undefined;
 
         if (!firstOperand) {
           firstOperand = operandTokens;
           firstOperandIndex = i;
-          i += operandTokens.length - 1;
+          i += operandTokens.length - shift - 1;
         } else {
           const secondOperand = operandTokens;
           const secondOperandIndex = i;
