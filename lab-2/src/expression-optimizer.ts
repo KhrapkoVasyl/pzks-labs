@@ -515,16 +515,17 @@ export class ExpressionOptimizer {
         }
 
         const prevToken = tokens[i - 1];
+        const nextToken = tokens[i + tokensInParenthesis.length];
+
+        const operandsCount = innerTokens.filter(
+          (t) => t.type === TokenType.NUMBER || t.type === TokenType.IDENTIFIER
+        ).length;
+
         const expBefore = tokensToString(tokens);
 
         // Обрахунок випадків, коли перед дужками стоїть оператор множення або ділення
         if (prevToken?.type === TokenType.MULTIPLICATION_OPERATOR) {
-          const operands = innerTokens.filter(
-            (t) =>
-              t.type === TokenType.NUMBER || t.type === TokenType.IDENTIFIER
-          ).length;
-
-          if (operands > 1) {
+          if (operandsCount > 1) {
             continue;
           }
 
@@ -592,7 +593,11 @@ export class ExpressionOptimizer {
         }
 
         // Обрахунок випадків, коли перед дужками стоїть оператор віднімання або додавання
-        if (prevToken?.type === TokenType.ADDITION_OPERATOR) {
+        if (
+          prevToken?.type === TokenType.ADDITION_OPERATOR &&
+          (operandsCount === 1 ||
+            nextToken?.type !== TokenType.MULTIPLICATION_OPERATOR)
+        ) {
           const isNegative = prevToken?.value === '-';
 
           if (isNegative) {
