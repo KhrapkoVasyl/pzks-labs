@@ -639,7 +639,13 @@ export class ExpressionOptimizer {
         }
 
         // Обрахунок з відсутністю оператора перед дужками
-        if (!prevToken || prevToken.type === TokenType.PAREN_OPEN) {
+        if (
+          !prevToken ||
+          (prevToken.type === TokenType.PAREN_OPEN &&
+            (!nextToken ||
+              nextToken.type !== TokenType.MULTIPLICATION_OPERATOR ||
+              operandsCount === 1))
+        ) {
           tokens.splice(i, innerTokens.length + 2, ...innerTokens);
           const expAfter = tokensToString(tokens);
 
