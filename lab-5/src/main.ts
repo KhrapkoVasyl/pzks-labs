@@ -1,8 +1,3 @@
-import { TreeBuilder } from './tree-builder';
-import { ExpressionAnalyzer } from './expression-analyzer';
-import { ExpressionOptimizer } from './expression-optimizer';
-import { ExpressionGrouper } from './expression-grouper';
-import { tokensToString } from './utils';
 import { handleExpressions } from './examples/index';
 
 const examples = [

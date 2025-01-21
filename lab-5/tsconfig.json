@@ -6,7 +6,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "types": ["jest"],
+    "types": ["node", "jest"],
     "baseUrl": ".",
     "paths": {
       "*": ["node_modules/*"]

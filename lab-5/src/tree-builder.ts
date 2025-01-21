@@ -1,10 +1,9 @@
 import { Token, TokenType, ValidationError } from './expression-analyzer';
 
-interface TreeNode {
+export interface TreeNode {
   value: string;
   left?: TreeNode;
   right?: TreeNode;
-  unarySign?: string;
 }
 
 export class TreeBuilder {
@@ -121,23 +120,21 @@ export class TreeBuilder {
       this.logTree(node.right, `${prefix}${isLeft ? '│   ' : '    '}`, false);
     }
 
-    console.log(
-      `${prefix}${isLeft ? '└── ' : '┌── '}${
-        node.unarySign ? node.unarySign : ''
-      }${value}`
-    );
+    console.log(`${prefix}${isLeft ? '└── ' : '┌── '}$${value}`);
 
     if (node.left) {
       this.logTree(node.left, `${prefix}${isLeft ? '    ' : '│   '}`, true);
     }
   }
 
-  handleTree(tokens: Token[]): void {
+  handleTree(tokens: Token[]): TreeNode {
     const postfixTokens = this.toPostfix(tokens);
 
     const tree = this.build(postfixTokens);
 
     console.log('\n====== Дерево виразу ======\n');
     this.logTree(tree);
+
+    return tree!;
   }
 }

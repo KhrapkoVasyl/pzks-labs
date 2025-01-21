@@ -45,7 +45,7 @@ export class ExpressionOptimizer {
 
     log += '\n==========\n';
 
-    console.log(log);
+    // console.log(log);
 
     return result;
   }

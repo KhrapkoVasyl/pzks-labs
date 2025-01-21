@@ -2,11 +2,13 @@ import { TreeBuilder } from '../tree-builder';
 import { ExpressionAnalyzer } from '../expression-analyzer';
 import { ExpressionOptimizer } from '../expression-optimizer';
 import { ExpressionGrouper } from '../expression-grouper';
+import { MatrixSystem } from '../modeling';
 
 const analyzer = new ExpressionAnalyzer();
 const optimizer = new ExpressionOptimizer();
 const grouper = new ExpressionGrouper();
 const treeBuilder = new TreeBuilder();
+const system = new MatrixSystem();
 
 export function handleExpressions(expressions: string[]): void {
   for (const expression of expressions) {
@@ -27,6 +29,8 @@ export function handleExpressions(expressions: string[]): void {
       optimizationResult.optimizedExpression!
     );
 
-    treeBuilder.handleTree(groupingResult.groupedExpression);
+    const tree = treeBuilder.handleTree(groupingResult.groupedExpression);
+
+    system.buildJobsFromTree(tree);
   }
 }
