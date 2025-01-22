@@ -86,6 +86,26 @@ export class MatrixSystem {
 
     traverse(tree, 0);
 
+    let newJobIdCounter = 1;
+    const oldToNewIdMap = new Map<number, number>();
+
+    for (let level = jobsWithHierarchy.length - 1; level >= 0; level--) {
+      for (const job of jobsWithHierarchy[level]) {
+        const newId = newJobIdCounter++;
+        oldToNewIdMap.set(job.id, newId);
+        job.id = newId;
+      }
+    }
+
+    // Проставлення послідовної нумерації id задач у порядку виконання
+    for (const levelJobs of jobsWithHierarchy) {
+      for (const job of levelJobs) {
+        job.dependenciesIds = job.dependenciesIds
+          .map((oldId) => oldToNewIdMap.get(oldId) || -1)
+          .filter((id) => id !== -1);
+      }
+    }
+
     this.logToConsole(
       '\n\n ====== Jobs with hierarchy: ',
       util.inspect(jobsWithHierarchy, { depth: null, colors: true }),
