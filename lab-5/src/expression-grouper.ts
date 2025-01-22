@@ -18,9 +18,9 @@ export class ExpressionGrouper {
     const expression = tokensToString(groupedExpression);
 
     let log = `Згруповано вираз: ${expression}`;
-    log += steps.length
-      ? `\n\nКроки групування:\n${steps}`
-      : '\n\nЖодного можливого кроку групування не знайдено.\n\n';
+    // log += steps.length
+    //   ? `\n\nКроки групування:\n${steps}`
+    //   : '\n\nЖодного можливого кроку групування не знайдено.\n\n';
 
     console.log(log);
 

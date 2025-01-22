@@ -44,9 +44,8 @@ export class ProcessingUnit {
           this.tickToComplete = undefined;
         }
       }
-
-      this.handleDataTransferOperation(tick);
     }
+    this.handleDataTransferOperation(tick);
   }
 
   handleDataTransferOperation(tick: number): void {

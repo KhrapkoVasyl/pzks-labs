@@ -2,7 +2,7 @@ import { TreeBuilder } from '../tree-builder';
 import { ExpressionAnalyzer } from '../expression-analyzer';
 import { ExpressionOptimizer } from '../expression-optimizer';
 import { ExpressionGrouper } from '../expression-grouper';
-import { MatrixSystem } from '../modeling';
+import { MatrixSystem, MatrixSystemEvaluator } from '../modeling';
 
 const analyzer = new ExpressionAnalyzer();
 const optimizer = new ExpressionOptimizer();
@@ -30,7 +30,12 @@ export function handleExpressions(expressions: string[]): void {
 
     const tree = treeBuilder.handleTree(groupingResult.groupedExpression);
 
-    const system = new MatrixSystem(tree, 5);
-    system.simulate();
+    const parSystem = new MatrixSystem(tree, 5);
+    const seqSystem = new MatrixSystem(tree, 1, false);
+    parSystem.simulate();
+    seqSystem.simulate();
+
+    const evaluator = new MatrixSystemEvaluator(parSystem, seqSystem);
+    evaluator.logResults();
   }
 }

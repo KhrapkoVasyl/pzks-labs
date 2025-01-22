@@ -106,7 +106,6 @@ export class MatrixSystem {
       }
     }
 
-    // Проставлення послідовної нумерації id задач у порядку виконання
     for (const levelJobs of jobsWithHierarchy) {
       for (const job of levelJobs) {
         job.dependenciesIds = job.dependenciesIds
@@ -157,16 +156,13 @@ export class MatrixSystem {
   }
 
   private assignJobs() {
-    this.logToConsole('\n\n Assigning jobs \n\n');
     const freeProcessors = this.processors.filter(
       (processor) => !processor.currentJob
     );
 
     const currentOperation = this.getCurrentOperation();
-    this.logToConsole('\n\n Current operation: ', currentOperation, '\n\n');
 
     let availableJobs = this.getAvailableJobs();
-    this.logToConsole('\n\n Available jobs: ', availableJobs, '\n\n');
 
     if (currentOperation) {
       availableJobs = availableJobs.filter(
@@ -174,7 +170,6 @@ export class MatrixSystem {
       );
     } else if (availableJobs.length > 0) {
       const firstJobOperation = availableJobs[0].job.operation;
-      this.logToConsole('\n\n firstJobOperation: ', firstJobOperation, '\n\n');
       availableJobs = availableJobs.filter(
         ({ job }) => job.operation === firstJobOperation
       );
@@ -190,7 +185,6 @@ export class MatrixSystem {
         freeProcessors,
         job
       );
-      this.logToConsole('\n\n Best processor: ', bestProcessor, '\n\n');
 
       if (bestProcessor) {
         this.handleDataTransfer(job, dependencyProcessors, bestProcessor);
@@ -216,7 +210,10 @@ export class MatrixSystem {
         );
 
         if (sourceProcessor && sourceProcessor.id !== targetProcessor.id) {
-          if (sourceProcessor.id !== this.centralProcessor.id) {
+          if (
+            sourceProcessor.id !== this.centralProcessor.id &&
+            targetProcessor.id !== this.centralProcessor.id
+          ) {
             this.dataTransfers.push({
               source: sourceProcessor.id,
               target: this.centralProcessor.id,
@@ -252,12 +249,6 @@ export class MatrixSystem {
     for (let i = 0; i < freeProcessors.length; i++) {
       const processor = freeProcessors[i];
 
-      this.logToConsole(
-        '\n\n Iteration details: ',
-        { freeProcessors, processor, job, dependencyProcessors },
-        '\n\n'
-      );
-
       if (job.dependenciesIds.length === 0) {
         freeProcessors.splice(i, 1);
         return processor;
@@ -271,21 +262,11 @@ export class MatrixSystem {
 
           return processor;
         } else if (missingDependencies < minMissingDependencies) {
-          this.logToConsole('\n\n HERE1: ', {
-            missingDependencies,
-            minMissingDependencies,
-          });
           minMissingDependencies = missingDependencies;
           bestProcessor = processor;
         }
       }
     }
-
-    this.logToConsole(
-      '\n\n Inside findBestProcessorByDependencies: ',
-      { bestProcessor, freeProcessors },
-      '\n\n'
-    );
 
     if (bestProcessor) {
       for (let i = 0; i < freeProcessors.length; i++) {
@@ -371,10 +352,7 @@ export class MatrixSystem {
 
     const maxTick = Math.max(...Object.keys(historyMap).map(Number));
 
-    const history: {
-      tick: number;
-      actions: { processorId: number; operation: string; jobId?: number }[];
-    }[] = [];
+    const history: History = [];
     for (let tick = 1; tick <= maxTick; tick++) {
       history.push({ tick, actions: historyMap[tick] || [] });
     }
@@ -382,25 +360,26 @@ export class MatrixSystem {
     return history;
   }
 
-  private logHistory(history: History, delimiter: string = ' '): void {
-    const header = ['Tick', ...this.processors.map((p) => `P${p.id}`)].join(
-      '\t\t'
-    );
+  private logHistory(history: History, delimiter: string = '|'): void {
+    const columnWidth = 15;
+
+    const header = [
+      'Tick',
+      ...this.processors.map((p) => `P${p.id}`.padEnd(columnWidth)),
+    ].join('\t');
     this.logToConsole(header);
 
     history.forEach(({ tick, actions }) => {
       const row = [
-        tick.toString(),
+        tick.toString().padEnd(5),
         ...this.processors.map((p) => {
           const processorActions = actions
             .filter((a) => a.processorId === p.id)
             .map((a) => `[${a.operation}${a.jobId ? `(${a.jobId})` : ''}]`);
 
-          return processorActions
-            .concat(Array(2 - processorActions.length).fill(''))
-            .join(delimiter);
+          return processorActions.join(delimiter).padEnd(columnWidth);
         }),
-      ].join('\t\t');
+      ].join('\t');
       this.logToConsole(row);
     });
 
