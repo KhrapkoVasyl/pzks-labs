@@ -31,5 +31,6 @@ export function handleExpressions(expressions: string[]): void {
     const tree = treeBuilder.handleTree(groupingResult.groupedExpression);
 
     const system = new MatrixSystem(tree, 5);
+    system.simulate();
   }
 }
