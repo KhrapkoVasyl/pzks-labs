@@ -32,7 +32,15 @@ export class MatrixSystem {
   centralProcessor: ProcessingUnit;
   tick: number = 0;
 
-  constructor(tree: TreeNode, processorCount: number) {
+  enabledLogger: boolean = true;
+
+  constructor(
+    tree: TreeNode,
+    processorCount: number,
+    enabledLogger: boolean = true
+  ) {
+    this.enabledLogger = enabledLogger;
+
     this.buildJobsFromTree(tree);
 
     for (let i = 0; i < processorCount; i++) {
@@ -42,6 +50,7 @@ export class MatrixSystem {
     }
 
     this.centralProcessor = this.processors[0];
+    this.assignJobs();
   }
 
   private buildJobsFromTree(tree: TreeNode): void {
@@ -77,7 +86,7 @@ export class MatrixSystem {
 
     traverse(tree, 0);
 
-    console.log(
+    this.logToConsole(
       '\n\n ====== Jobs with hierarchy: ',
       util.inspect(jobsWithHierarchy, { depth: null, colors: true }),
       '\n\n'
@@ -90,7 +99,7 @@ export class MatrixSystem {
       this.jobs.push(...sortedLevel);
     }
 
-    console.log('\n\n ======= Jobs: ', this.jobs, '\n\n');
+    this.logToConsole('\n\n ======= Jobs: ', this.jobs, '\n\n');
   }
 
   private getAvailableJobs() {
@@ -119,16 +128,16 @@ export class MatrixSystem {
   }
 
   private assignJobs() {
-    console.log('\n\n Assigning jobs \n\n');
+    this.logToConsole('\n\n Assigning jobs \n\n');
     const freeProcessors = this.processors.filter(
       (processor) => !processor.currentJob
     );
 
     const currentOperation = this.getCurrentOperation();
-    console.log('\n\n Current operation: ', currentOperation, '\n\n');
+    this.logToConsole('\n\n Current operation: ', currentOperation, '\n\n');
 
     let availableJobs = this.getAvailableJobs();
-    console.log('\n\n Available jobs: ', availableJobs, '\n\n');
+    this.logToConsole('\n\n Available jobs: ', availableJobs, '\n\n');
 
     if (currentOperation) {
       availableJobs = availableJobs.filter(
@@ -136,7 +145,7 @@ export class MatrixSystem {
       );
     } else if (availableJobs.length > 0) {
       const firstJobOperation = availableJobs[0].job.operation;
-      console.log('\n\n firstJobOperation: ', firstJobOperation, '\n\n');
+      this.logToConsole('\n\n firstJobOperation: ', firstJobOperation, '\n\n');
       availableJobs = availableJobs.filter(
         ({ job }) => job.operation === firstJobOperation
       );
@@ -152,7 +161,7 @@ export class MatrixSystem {
         freeProcessors,
         job
       );
-      console.log('\n\n Best processor: ', bestProcessor, '\n\n');
+      this.logToConsole('\n\n Best processor: ', bestProcessor, '\n\n');
 
       if (bestProcessor) {
         // TODO: handle dependencies (send/receiving data)
@@ -176,7 +185,7 @@ export class MatrixSystem {
     for (let i = 0; i < freeProcessors.length; i++) {
       const processor = freeProcessors[i];
 
-      console.log(
+      this.logToConsole(
         '\n\n Iteration details: ',
         { freeProcessors, processor, job, dependencyProcessors },
         '\n\n'
@@ -195,7 +204,7 @@ export class MatrixSystem {
 
           return processor;
         } else if (missingDependencies < minMissingDependencies) {
-          console.log('\n\n HERE1: ', {
+          this.logToConsole('\n\n HERE1: ', {
             missingDependencies,
             minMissingDependencies,
           });
@@ -205,7 +214,7 @@ export class MatrixSystem {
       }
     }
 
-    console.log(
+    this.logToConsole(
       '\n\n Inside findBestProcessorByDependencies: ',
       { bestProcessor, freeProcessors },
       '\n\n'
@@ -233,28 +242,82 @@ export class MatrixSystem {
     this.assignJobs();
   }
 
-  /**
-   * Runs the simulation until all jobs are completed.
-   * Logs the history of operations for each processor.
-   */
   simulate(): void {
-    console.log(`\n\n STEP OF SIMULATION : ${this.tick} \n\n`);
-    console.log(`\n\n JOBS: ${this.jobs} \n\n`);
-
     while (this.jobs.length > 0 || this.processors.some((p) => p.currentJob)) {
       this.nextTick();
-
-      if (this.tick === 4) {
-        return;
-      }
     }
 
-    console.log('\nSimulation complete:\n');
+    const history = this.generateHistory();
+    this.logHistory(history);
+  }
+
+  private generateHistory(): {
+    tick: number;
+    actions: { processorId: number; operation: string; jobId?: number }[];
+  }[] {
+    const historyMap: {
+      [tick: number]: {
+        processorId: number;
+        operation: string;
+        jobId?: number;
+      }[];
+    } = {};
+
     this.processors.forEach((processor) => {
-      console.log(
-        `Processor ${processor.id} history:\n`,
-        util.inspect(processor.history, { depth: null, colors: true })
-      );
+      processor.history.forEach(({ tick, job }) => {
+        if (!historyMap[tick]) {
+          historyMap[tick] = [];
+        }
+        historyMap[tick].push({
+          processorId: processor.id,
+          operation: job.operation || '',
+          jobId: job.id,
+        });
+      });
     });
+
+    const maxTick = Math.max(...Object.keys(historyMap).map(Number));
+
+    const history: {
+      tick: number;
+      actions: { processorId: number; operation: string; jobId?: number }[];
+    }[] = [];
+    for (let tick = 1; tick <= maxTick; tick++) {
+      history.push({ tick, actions: historyMap[tick] || [] });
+    }
+
+    return history;
+  }
+
+  private logHistory(
+    history: {
+      tick: number;
+      actions: { processorId: number; operation: string; jobId?: number }[];
+    }[]
+  ): void {
+    const header = ['Tick', ...this.processors.map((p) => `P${p.id}`)].join(
+      '\t\t'
+    );
+    this.logToConsole(header);
+
+    history.forEach(({ tick, actions }) => {
+      const row = [
+        tick.toString(),
+        ...this.processors.map((p) => {
+          const action = actions.find((a) => a.processorId === p.id);
+          return action
+            ? `[${action.operation}${action.jobId ? `(${action.jobId})` : ''}]`
+            : '';
+        }),
+      ].join('\t\t');
+      this.logToConsole(row);
+    });
+    this.logToConsole('\n\n');
+  }
+
+  private logToConsole(message: any, ...params: any[]): void {
+    if (this.enabledLogger) {
+      console.log(message, ...params);
+    }
   }
 }

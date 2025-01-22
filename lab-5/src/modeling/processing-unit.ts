@@ -4,7 +4,7 @@ export class ProcessingUnit {
   id: number;
   isCentral: boolean;
   jobResults: { [jobId: string]: boolean } = {};
-  history: { tick: number; job: Job }[]; // Tracks operations per tick
+  history: { tick: number; job: Job; tickToComplete: number }[];
 
   currentJob?: Job;
   tickToComplete?: number;
@@ -16,8 +16,12 @@ export class ProcessingUnit {
     this.history = [];
   }
 
-  logOperation(tick: number, operation: string): void {
-    this.history.push({ tick, job: this.currentJob! });
+  logOperation(tick: number): void {
+    this.history.push({
+      tick,
+      job: this.currentJob!,
+      tickToComplete: this.tickToComplete!,
+    });
   }
 
   nextTick(tick: number) {
@@ -29,37 +33,51 @@ export class ProcessingUnit {
     );
 
     if (this.currentJob) {
-      const status = this.currentJob.status;
-      if (status === JobStatus.Idle) {
-        const hasDependencies = this.hasDependencies();
+      if (this.currentJob.status === JobStatus.Idle) {
+        const hasDependencies = this.hasDependenciesData();
         if (hasDependencies) {
           this.currentJob.status = JobStatus.Process;
         }
       }
 
-      this.tickToComplete! -= 1;
-      this.logOperation(tick, this.currentJob.operation);
+      if (this.currentJob.status === JobStatus.Process) {
+        this.tickToComplete! -= 1;
 
-      if (this.tickToComplete === 0) {
-        this.jobResults[this.currentJob.id] = true;
-        console.log(
-          'Processor ',
-          this.id,
-          ' finished processing job ',
-          this.currentJob
-        );
+        this.logOperation(tick);
 
-        this.currentJob.status = JobStatus.Done;
+        if (this.tickToComplete === 0) {
+          this.jobResults[this.currentJob.id] = true;
+          console.log(
+            'Processor ',
+            this.id,
+            ' finished processing job ',
+            this.currentJob
+          );
 
-        this.currentJob = undefined;
-        this.tickToComplete = undefined;
+          this.currentJob.status = JobStatus.Done;
+
+          this.currentJob = undefined;
+          this.tickToComplete = undefined;
+        }
       }
     }
   }
 
-  hasDependencies(): boolean {
-    // TODO: Implement this method
+  hasDependenciesData(): boolean {
+    // TODO: mock
     return true;
+
+    // if (!this.currentJob) {
+    //   return false;
+    // }
+
+    // for (const depId of this.currentJob.dependenciesIds) {
+    //   if (!this.jobResults[depId]) {
+    //     return false;
+    //   }
+    // }
+
+    // return true;
   }
 
   hasResult(jobId: number): boolean {
