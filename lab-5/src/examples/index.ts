@@ -8,7 +8,6 @@ const analyzer = new ExpressionAnalyzer();
 const optimizer = new ExpressionOptimizer();
 const grouper = new ExpressionGrouper();
 const treeBuilder = new TreeBuilder();
-const system = new MatrixSystem();
 
 export function handleExpressions(expressions: string[]): void {
   for (const expression of expressions) {
@@ -31,6 +30,6 @@ export function handleExpressions(expressions: string[]): void {
 
     const tree = treeBuilder.handleTree(groupingResult.groupedExpression);
 
-    system.buildJobsFromTree(tree);
+    const system = new MatrixSystem(tree, 5);
   }
 }

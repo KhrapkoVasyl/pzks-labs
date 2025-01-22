@@ -1,4 +1,7 @@
+import util from 'util';
+
 import { TreeNode } from '../tree-builder';
+import { ProcessingUnit } from './processing-unit';
 
 export enum JobStatus {
   Idle = 'idle',
@@ -24,11 +27,25 @@ export const operationCost: { [key: string]: number } = {
 
 export class MatrixSystem {
   jobs: Job[] = [];
-  doneJobs: number[] = [];
+  // doneJobs: number[] = [];
 
-  constructor() {}
+  processors: ProcessingUnit[] = [];
+  centralProcessor: ProcessingUnit;
+  tick: number = 0;
 
-  buildJobsFromTree(tree: TreeNode): void {
+  constructor(tree: TreeNode, processorCount: number) {
+    this.buildJobsFromTree(tree);
+
+    for (let i = 0; i < processorCount; i++) {
+      const isCentral = i === 0;
+      const processor = new ProcessingUnit(i + 1, isCentral);
+      this.processors.push(processor);
+    }
+
+    this.centralProcessor = this.processors[0];
+  }
+
+  private buildJobsFromTree(tree: TreeNode): void {
     let jobIdCounter = 1;
     const jobsWithHierarchy: Job[][] = [];
 
@@ -62,8 +79,8 @@ export class MatrixSystem {
     traverse(tree, 0);
 
     console.log(
-      '\n\n Jobs with hierarchy: ',
-      JSON.stringify(jobsWithHierarchy, null, 2),
+      '\n\n ====== Jobs with hierarchy: ',
+      util.inspect(jobsWithHierarchy, { depth: null, colors: true }),
       '\n\n'
     );
 
@@ -74,6 +91,6 @@ export class MatrixSystem {
       this.jobs.push(...sortedLevel);
     }
 
-    console.log('\n\n Jobs: ', this.jobs, '\n\n');
+    console.log('\n\n ======= Jobs: ', this.jobs, '\n\n');
   }
 }
