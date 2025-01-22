@@ -8,6 +8,7 @@ export class ProcessingUnit {
 
   currentJob?: Job;
   tickToComplete?: number;
+  dataTransferOperation?: Job;
 
   constructor(id: number, isCentral: boolean) {
     this.id = id;
@@ -16,22 +17,11 @@ export class ProcessingUnit {
     this.history = [];
   }
 
-  logOperation(tick: number): void {
-    this.history.push({
-      tick,
-      job: this.currentJob!,
-      tickToComplete: this.tickToComplete!,
-    });
+  logOperation(tick: number, job: Job, tickToComplete: number): void {
+    this.history.push({ tick, job, tickToComplete });
   }
 
   nextTick(tick: number) {
-    console.log(
-      `\n\n TICK ${tick} | Processor `,
-      this.id,
-      ' is processing job: ',
-      this.currentJob
-    );
-
     if (this.currentJob) {
       if (this.currentJob.status === JobStatus.Idle) {
         const hasDependencies = this.hasDependenciesData();
@@ -43,16 +33,10 @@ export class ProcessingUnit {
       if (this.currentJob.status === JobStatus.Process) {
         this.tickToComplete! -= 1;
 
-        this.logOperation(tick);
+        this.logOperation(tick, this.currentJob, this.tickToComplete!);
 
         if (this.tickToComplete === 0) {
           this.jobResults[this.currentJob.id] = true;
-          console.log(
-            'Processor ',
-            this.id,
-            ' finished processing job ',
-            this.currentJob
-          );
 
           this.currentJob.status = JobStatus.Done;
 
@@ -60,38 +44,49 @@ export class ProcessingUnit {
           this.tickToComplete = undefined;
         }
       }
+
+      this.handleDataTransferOperation(tick);
+    }
+  }
+
+  handleDataTransferOperation(tick: number): void {
+    if (this.dataTransferOperation) {
+      if (this.dataTransferOperation?.operation === 'R') {
+        this.jobResults[this.dataTransferOperation.id] = true;
+      }
+
+      this.dataTransferOperation.status = JobStatus.Done;
+
+      this.logOperation(tick, this.dataTransferOperation, 0);
+      this.dataTransferOperation = undefined;
     }
   }
 
   hasDependenciesData(): boolean {
-    // TODO: mock
+    if (!this.currentJob) {
+      return false;
+    }
+
+    for (const depId of this.currentJob.dependenciesIds) {
+      if (!this.jobResults[depId]) {
+        return false;
+      }
+    }
+
     return true;
-
-    // if (!this.currentJob) {
-    //   return false;
-    // }
-
-    // for (const depId of this.currentJob.dependenciesIds) {
-    //   if (!this.jobResults[depId]) {
-    //     return false;
-    //   }
-    // }
-
-    // return true;
   }
 
   hasResult(jobId: number): boolean {
     return Boolean(this.jobResults[jobId]);
   }
 
+  setDataTransferOperation(dataTransferOperation: Job): void {
+    this.dataTransferOperation = dataTransferOperation;
+  }
+
   assignJob(job: Job): void {
     this.currentJob = job;
     const operationCost = operationsCosts[job.operation];
     this.tickToComplete = operationCost;
-
-    console.log('\n\n Assigned job to processor ', this.id, 'JOB: ', {
-      currentJob: this.currentJob,
-      ttc: this.tickToComplete,
-    });
   }
 }

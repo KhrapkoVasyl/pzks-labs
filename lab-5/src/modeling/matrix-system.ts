@@ -11,7 +11,7 @@ export enum JobStatus {
 
 export interface Job {
   id: number;
-  operation: '+' | '-' | '*' | '/';
+  operation: '+' | '-' | '*' | '/' | 'R' | 'S';
   dependenciesIds: number[];
   status: JobStatus;
 }
@@ -25,12 +25,21 @@ export const operationsCosts: { [key: string]: number } = {
   R: 1, // receiving data
 };
 
+export type History = {
+  tick: number;
+  actions: { processorId: number; operation: string; jobId?: number }[];
+}[];
+
 export class MatrixSystem {
   jobs: Job[] = [];
 
   processors: ProcessingUnit[] = [];
   centralProcessor: ProcessingUnit;
   tick: number = 0;
+  history?: History;
+
+  private dataTransfers: { source: number; target: number; jobId: number }[] =
+    [];
 
   enabledLogger: boolean = true;
 
@@ -184,10 +193,48 @@ export class MatrixSystem {
       this.logToConsole('\n\n Best processor: ', bestProcessor, '\n\n');
 
       if (bestProcessor) {
-        // TODO: handle dependencies (send/receiving data)
+        this.handleDataTransfer(job, dependencyProcessors, bestProcessor);
         const jobIndex = this.jobs.findIndex((j) => j.id === job.id);
         this.jobs.splice(jobIndex, 1);
         bestProcessor.assignJob(job);
+      }
+    }
+  }
+
+  private handleDataTransfer(
+    job: Job,
+    dependencyProcessors: number[][],
+    targetProcessor: ProcessingUnit
+  ): void {
+    for (let i = 0; i < job.dependenciesIds.length; i++) {
+      const depId = job.dependenciesIds[i];
+      const processorsWithData = dependencyProcessors[i];
+
+      if (!processorsWithData.includes(targetProcessor.id)) {
+        const sourceProcessor = this.processors.find((processor) =>
+          processor.hasResult(depId)
+        );
+
+        if (sourceProcessor && sourceProcessor.id !== targetProcessor.id) {
+          if (sourceProcessor.id !== this.centralProcessor.id) {
+            this.dataTransfers.push({
+              source: sourceProcessor.id,
+              target: this.centralProcessor.id,
+              jobId: depId,
+            });
+            this.dataTransfers.push({
+              source: this.centralProcessor.id,
+              target: targetProcessor.id,
+              jobId: depId,
+            });
+          } else {
+            this.dataTransfers.push({
+              source: sourceProcessor.id,
+              target: targetProcessor.id,
+              jobId: depId,
+            });
+          }
+        }
       }
     }
   }
@@ -252,8 +299,37 @@ export class MatrixSystem {
     return bestProcessor;
   }
 
+  handleDataTransferOnNextTick(): void {
+    const dataTransfer = this.dataTransfers.shift();
+
+    if (dataTransfer) {
+      const { source, target, jobId } = dataTransfer;
+
+      let sendOperation = {
+        id: jobId,
+        operation: 'S',
+        dependenciesIds: [],
+        status: JobStatus.Idle,
+      } as Job;
+
+      let receiveOperation = { ...sendOperation, operation: 'R' } as Job;
+
+      const sourceProcessor = this.processors.find(
+        (processor) => processor.id === source
+      );
+      const targetProcessor = this.processors.find(
+        (processor) => processor.id === target
+      );
+
+      sourceProcessor?.setDataTransferOperation(sendOperation);
+      targetProcessor?.setDataTransferOperation(receiveOperation);
+    }
+  }
+
   nextTick(): void {
     this.tick++;
+
+    this.handleDataTransferOnNextTick();
 
     this.processors.forEach((processor) => {
       processor.nextTick(this.tick);
@@ -267,14 +343,11 @@ export class MatrixSystem {
       this.nextTick();
     }
 
-    const history = this.generateHistory();
-    this.logHistory(history);
+    this.history = this.generateHistory();
+    this.logHistory(this.history);
   }
 
-  private generateHistory(): {
-    tick: number;
-    actions: { processorId: number; operation: string; jobId?: number }[];
-  }[] {
+  private generateHistory(): History {
     const historyMap: {
       [tick: number]: {
         processorId: number;
@@ -309,12 +382,7 @@ export class MatrixSystem {
     return history;
   }
 
-  private logHistory(
-    history: {
-      tick: number;
-      actions: { processorId: number; operation: string; jobId?: number }[];
-    }[]
-  ): void {
+  private logHistory(history: History, delimiter: string = ' '): void {
     const header = ['Tick', ...this.processors.map((p) => `P${p.id}`)].join(
       '\t\t'
     );
@@ -324,14 +392,18 @@ export class MatrixSystem {
       const row = [
         tick.toString(),
         ...this.processors.map((p) => {
-          const action = actions.find((a) => a.processorId === p.id);
-          return action
-            ? `[${action.operation}${action.jobId ? `(${action.jobId})` : ''}]`
-            : '';
+          const processorActions = actions
+            .filter((a) => a.processorId === p.id)
+            .map((a) => `[${a.operation}${a.jobId ? `(${a.jobId})` : ''}]`);
+
+          return processorActions
+            .concat(Array(2 - processorActions.length).fill(''))
+            .join(delimiter);
         }),
       ].join('\t\t');
       this.logToConsole(row);
     });
+
     this.logToConsole('\n\n');
   }
 
