@@ -225,7 +225,7 @@ export class MatrixSystem {
               jobId: depId,
             });
           } else {
-            this.dataTransfers.push({
+            this.dataTransfers.unshift({
               source: sourceProcessor.id,
               target: targetProcessor.id,
               jobId: depId,
